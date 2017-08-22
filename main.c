@@ -1,84 +1,61 @@
-#include<stdio.h>
-
-#define LEN 100
+#include <stdio.h>
+#include <stdlib.h>
+#include "dgemm-blocked.h"
 
 /*
 Análise:
 
-sudo perf record -e L1-dcache-load-misses ./main
+sudo perf record -e L1-dcache-load-misses main/main
 sudo perf report -v
 */
 
-void multiplica_matriz(int matrizA[LEN][LEN], int matrizB[LEN][LEN], int matrizC[LEN][LEN]);
-void multiplica_matriz_slow(int matrizA[LEN][LEN], int matrizB[LEN][LEN], int matrizC[LEN][LEN]);
-void print_matriz(int matriz[LEN][LEN]);
-void fill(int matriz[LEN][LEN]);
-void clean(int matriz[LEN][LEN]);
+#define LEN 100
 
-int matrizA[LEN][LEN], matrizB[LEN][LEN], matrizC[LEN][LEN];
+void print_matriz(int n, double** matriz);
+void fill(int n, double** matriz);
+double** square_malloc(int n);
+
+double **A, **B, **C;
 
 int main(int argc, char** argv){
     
-    fill(matrizA);
-    fill(matrizB);
-    
-    multiplica_matriz(matrizA, matrizB, matrizC);
-    //print_matriz(matrizC);
+    A = square_malloc(LEN);
+    B = square_malloc(LEN);
+    C = square_malloc(LEN);
 
+    fill(LEN, A);
+    fill(LEN, B);
+    square_dgemm(LEN, A, B, C);
+    print_matriz(LEN, C);
+    
     return 0;
 }
 
-void fill(int matriz[LEN][LEN]){
+double** square_malloc(int n){
+    double **mat = malloc(n * sizeof(double*));
+    int i;
+    for(i = 0; i < n; i++){
+        mat[i] = malloc(n * sizeof(double));
+    }
+    return mat;
+}
+
+void fill(int n, double **matriz){
     int i, j;
-    for(i = 0; i < LEN; i++){
-        for(j = 0; j < LEN; j++){
-            matriz[i][j] = i + j;
+    for(i = 0; i < n; i++){
+        for(j = 0; j < n; j++){
+            matriz[i][j] = (double) (i + j);
         }
     }
 }
 
-void clean(int matriz[LEN][LEN]){
-    int i, j;
-    for(i = 0; i < LEN; i++){
-        for(j = 0; j < LEN; j++){
-            matriz[i][j] = 0;
-        }
-    }
-}
-
-void multiplica_matriz(int matrizA[LEN][LEN], int matrizB[LEN][LEN], int matrizC[LEN][LEN]){
-    clean(matrizC);
-    int i, j, k, r;
-    for(i = 0; i < LEN; i++){
-        for (k = 0; k < LEN; k++){
-            r = matrizA[i][k];
-            for (j = 0; j < LEN; j++){
-                matrizC[i][j] += r * matrizB[k][j];
-            }
-        }
-    }
-}
-
-void multiplica_matriz_slow(int matrizA[LEN][LEN], int matrizB[LEN][LEN], int matrizC[LEN][LEN]){
-    clean(matrizC);
-    int i, j, k, r;
-    for(j = 0; j < LEN; j++){
-        for (k = 0; k < LEN; k++){
-            r = matrizB[k][j];
-            for (i = 0; i < LEN; i++){
-                matrizC[i][j] += r * matrizA[i][k];
-            }
-        }
-    }
-}
-
-void print_matriz(int matriz[LEN][LEN]){
+void print_matriz(int n, double **matriz){
     int i, j;
     printf("{\n");
-    for(i = 0; i < LEN; i++){
+    for(i = 0; i < n; i++){
         printf("{");
-        for(j = 0; j < LEN; j++){
-            printf("%d", matriz[i][j]);
+        for(j = 0; j < n; j++){
+            printf("%f", matriz[i][j]);
             if(j < LEN - 1){
                 printf(", ");
             } else {

@@ -1,5 +1,5 @@
 all:
-	gcc main.c -o bin/main
+	gcc main.c dgemm-blocked.c -o bin/main -O1 -fstrict-aliasing -std=c99
 
 debug:
-	gcc main.c -o bin/main -ggdb
+	gcc main.c dgemm-blocked.c -o bin/main -O1 -fstrict-aliasing -std=c99 -ggdb
