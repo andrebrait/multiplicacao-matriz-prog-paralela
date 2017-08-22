@@ -9,7 +9,7 @@ sudo perf record -e L1-dcache-load-misses main/main
 sudo perf report -v
 */
 
-#define LEN 100
+#define LEN 1000
 
 void print_matriz(int n, double** matriz);
 void fill(int n, double** matriz);
