@@ -11,9 +11,10 @@ sudo perf report -v
 
 #define LEN 1000
 
-void print_matriz(int n, double** matriz);
-void fill(int n, double** matriz);
-double** square_malloc(int n);
+void print_matriz(int, double**);
+void fill(int, double**);
+double** square_malloc(int);
+void square_free(int, double**);
 
 double **A, **B, **C;
 
@@ -27,6 +28,10 @@ int main(int argc, char** argv){
     fill(LEN, B);
     square_dgemm(LEN, A, B, C);
     print_matriz(LEN, C);
+
+    square_free(LEN, A);
+    square_free(LEN, B);
+    square_free(LEN, C);
     
     return 0;
 }
@@ -38,6 +43,14 @@ double** square_malloc(int n){
         mat[i] = malloc(n * sizeof(double));
     }
     return mat;
+}
+
+void square_free(int n, double **matriz){
+    int i;
+    for(i = 0; i < n; i++){
+        free(matriz[i]);
+    }
+    free(matriz);
 }
 
 void fill(int n, double **matriz){
