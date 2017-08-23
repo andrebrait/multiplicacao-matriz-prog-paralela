@@ -2,15 +2,15 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Launch",
+            "name": "(gdb) Launch BLAS",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/bin/main",
+            "program": "${workspaceRoot}/benchmark-blas",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
             "environment": [],
-            "externalConsole": false,
+            "externalConsole": true,
             "MIMode": "gdb",
             "preLaunchTask": "build-debug",
             "setupCommands": [
@@ -22,10 +22,66 @@
             ]
         },
         {
-            "name": "(gdb) Attach",
+            "name": "(gdb) Attach BLAS",
             "type": "cppdbg",
             "request": "attach",
-            "program": "${workspaceRoot}/bin/main",
+            "program": "${workspaceRoot}/benchmark-blas",
+            "processId": "${command:pickProcess}",
+            "MIMode": "gdb"
+        },
+        {
+            "name": "(gdb) Launch NAIVE",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/benchmark-naive",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceRoot}",
+            "environment": [],
+            "externalConsole": true,
+            "MIMode": "gdb",
+            "preLaunchTask": "build-debug",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "(gdb) Attach NAIVE",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "${workspaceRoot}/benchmark-naive",
+            "processId": "${command:pickProcess}",
+            "MIMode": "gdb"
+        },
+        {
+            "name": "(gdb) Launch BLOCKED",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/benchmark-blocked",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceRoot}",
+            "environment": [],
+            "externalConsole": true,
+            "MIMode": "gdb",
+            "preLaunchTask": "build-debug",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "(gdb) Attach BLOCKED",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "${workspaceRoot}/benchmark-blocked",
             "processId": "${command:pickProcess}",
             "MIMode": "gdb"
         }
