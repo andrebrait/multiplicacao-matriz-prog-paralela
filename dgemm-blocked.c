@@ -1,50 +1,48 @@
-#include "dgemm-blocked.h"
+const char* dgemm_desc = "Simple blocked dgemm.";
 
-void clean(int, double **);
-void square_dgemm_ikj(int, double **, double **, double **);
-void square_dgemm_jki(int, double **, double **, double **);
-
-void square_dgemm(int n, double **A, double **B, double **C) {
-#ifdef IKJ
-    square_dgemm_ikj(n, A, B, C);
-#elif JKI
-    square_dgemm_jki(n, A, B, C);
+#if !defined(BLOCK_SIZE)
+#define BLOCK_SIZE 41
 #endif
-}
 
-void clean(int n, double **A) {
-    int i, j;
-    for (i = 0; i < n; i++) {
-        for (j = 0; j < n; j++) {
-            A[i][j] = 0.0;
-        }
+#define min(a,b) (((a)<(b))?(a):(b))
+
+/* This auxiliary subroutine performs a smaller dgemm operation
+ *  C := C + A * B
+ * where C is M-by-N, A is M-by-K, and B is K-by-N. */
+static void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
+{
+  /* For each row i of A */
+  for (int i = 0; i < M; ++i)
+    /* For each column j of B */ 
+    for (int j = 0; j < N; ++j) 
+    {
+      /* Compute C(i,j) */
+      double cij = C[i+j*lda];
+      for (int k = 0; k < K; ++k)
+	cij += A[i+k*lda] * B[k+j*lda];
+      C[i+j*lda] = cij;
     }
 }
 
-void square_dgemm_ikj(int n, double **A, double **B, double **C) {
-    clean(n, C);
-    int i, j, k;
-    double r;
-    for (i = 0; i < n; i++) {
-        for (k = 0; k < n; k++) {
-            r = A[i][k];
-            for (j = 0; j < n; j++) {
-                C[i][j] += r * B[k][j];
-            }
-        }
-    }
-}
+/* This routine performs a dgemm operation
+ *  C := C + A * B
+ * where A, B, and C are lda-by-lda matrices stored in column-major format. 
+ * On exit, A and B maintain their input values. */  
+void square_dgemm (int lda, double* A, double* B, double* C)
+{
+  /* For each block-row of A */ 
+  for (int i = 0; i < lda; i += BLOCK_SIZE)
+    /* For each block-column of B */
+    for (int j = 0; j < lda; j += BLOCK_SIZE)
+      /* Accumulate block dgemms into block of C */
+      for (int k = 0; k < lda; k += BLOCK_SIZE)
+      {
+	/* Correct block dimensions if block "goes off edge of" the matrix */
+	int M = min (BLOCK_SIZE, lda-i);
+	int N = min (BLOCK_SIZE, lda-j);
+	int K = min (BLOCK_SIZE, lda-k);
 
-void square_dgemm_jki(int n, double **A, double **B, double **C) {
-    clean(n, C);
-    int i, j, k;
-    double r;
-    for (j = 0; j < n; j++) {
-        for (k = 0; k < n; k++) {
-            r = B[k][j];
-            for (i = 0; i < n; i++) {
-                C[i][j] += r * A[i][k];
-            }
-        }
-    }
+	/* Perform individual block dgemm */
+	do_block(lda, M, N, K, A + i + k*lda, B + k + j*lda, C + i + j*lda);
+      }
 }
