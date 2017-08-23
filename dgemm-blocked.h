@@ -1,1 +1,1 @@
-void square_dgemm(int, double**, double**, double**);
+void square_dgemm(int, double **, double **, double **);
