@@ -6,7 +6,7 @@
         {
             "taskName": "build",
             "type": "shell",
-            "command": "make all",
+            "command": "make",
             "problemMatcher": [
                 "$gcc"
             ]
@@ -14,7 +14,7 @@
         {
             "taskName": "build-debug",
             "type": "shell",
-            "command": "make debug",
+            "command": "make CFLAGS:=\"$(CFLAGS) -ggdb\"",
             "problemMatcher": [
                 "$gcc"
             ]
