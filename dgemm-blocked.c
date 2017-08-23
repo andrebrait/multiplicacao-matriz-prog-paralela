@@ -9,18 +9,22 @@ const char *dgemm_desc = "Simple blocked dgemm.";
 /* This auxiliary subroutine performs a smaller dgemm operation
  *  C := C + A * B
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
-static void do_block(int lda, int M, int N, int K, double *A, double *B,
-                     double *C) {
+static void do_block(int lda, int M, int N, int K, double *restrict A,
+                     double *restrict B, double *restrict C) {
     /* For each row i of A */
     for (int i = 0; i < M; ++i) {
         /* For each column j of B */
         for (int j = 0; j < N; ++j) {
             /* Compute C(i,j) */
-            double cij = C[i + j * lda];
+            int j_index = j * lda;
+            int i_index = i + j_index;
+            double cij = C[i_index];
             for (int k = 0; k < K; ++k) {
-                cij += A[i + k * lda] * B[k + j * lda];
+                double a = A[i + k * lda];
+                double b = B[k + j_index];
+                cij += a * b;
             }
-            C[i + j * lda] = cij;
+            C[i_index] = cij;
         }
     }
 }
@@ -29,7 +33,8 @@ static void do_block(int lda, int M, int N, int K, double *A, double *B,
  *  C := C + A * B
  * where A, B, and C are lda-by-lda matrices stored in column-major format.
  * On exit, A and B maintain their input values. */
-void square_dgemm(int lda, double *A, double *B, double *C) {
+void square_dgemm(int lda, double *restrict A, double *restrict B,
+                  double *restrict C) {
     /* For each block-row of A */
     for (int i = 0; i < lda; i += BLOCK_SIZE) {
         /* For each block-column of B */
