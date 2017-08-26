@@ -6,10 +6,10 @@ OPT = -O1
 CFLAGS = -Wall -std=gnu99 -fstrict-aliasing $(OPT)
 LDFLAGS = -Wall
 # librt is needed for clock_gettime
-LDLIBS = -lrt -lblas
+LDLIBS = -lrt -lblas -lm
 
-targets = benchmark-naive benchmark-blocked benchmark-blas
-objects = benchmark.o dgemm-naive.o dgemm-blocked.o dgemm-blas.o  
+targets = benchmark-naive benchmark-blocked benchmark-blas benchmark-strassen
+objects = benchmark.o dgemm-naive.o dgemm-blocked.o dgemm-blas.o  dgemm-strassen.o
 
 .PHONY : default
 default : all
@@ -22,6 +22,8 @@ benchmark-naive : benchmark.o dgemm-naive.o
 benchmark-blocked : benchmark.o dgemm-blocked.o
 	$(CC) -o $@ $^ $(LDLIBS)
 benchmark-blas : benchmark.o dgemm-blas.o
+	$(CC) -o $@ $^ $(LDLIBS)
+benchmark-strassen : benchmark.o dgemm-strassen.o
 	$(CC) -o $@ $^ $(LDLIBS)
 
 %.o : %.c
