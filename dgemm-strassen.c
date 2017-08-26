@@ -123,6 +123,8 @@ static matrix *multiply(matrix *restrict matrix_A, matrix *restrict matrix_B) {
     F = (matrix *)(malloc(sizeof(matrix)));
     G = (matrix *)(malloc(sizeof(matrix)));
     H = (matrix *)(malloc(sizeof(matrix)));
+    result = (matrix *)(malloc(sizeof(matrix)));
+    result->data = (double *)(malloc(n * n * sizeof(double)));
 
     A->data = B->data = C->data = D->data = data_A;
     E->data = F->data = G->data = H->data = data_B;
@@ -182,6 +184,30 @@ static matrix *multiply(matrix *restrict matrix_A, matrix *restrict matrix_B) {
     Q2 = plus(P1, P2);
     Q3 = plus(P3, P4);
     Q4 = minus(minus(plus(P1, P5), P3), P7);
+
+    double *restrict matriz_C = result->data;
+
+    for (m1_i = Q1->row_start, i = 0; m1_i <= Q1->row_end; m1_i++, i++)
+        for (m1_j = Q1->column_start, j = 0; m1_j <= Q1->column_end;
+             m1_j++, j++)
+            matriz_C[i * n + j] = Q1->data[m1_i][m1_j];
+
+    for (m1_i = Q2->row_start, i = 0; m1_i <= Q2->row_end; m1_i++, i++)
+        for (m1_j = Q2->column_start, j = n / 2; m1_j <= Q2->column_end;
+             m1_j++, j++)
+            matriz_C[i * n + j] = Q2->data[m1_i][m1_j];
+
+    for (m1_i = Q3->row_start, i = n / 2; m1_i <= Q3->row_end; m1_i++, i++)
+        for (m1_j = Q3->column_start, j = 0; m1_j <= Q3->column_end;
+             m1_j++, j++)
+            matriz_C[i * n + j] = Q3->data[m1_i][m1_j];
+
+    for (m1_i = Q4->row_start, i = n / 2; m1_i <= Q4->row_end; m1_i++, i++)
+        for (m1_j = Q4->column_start, j = n / 2; m1_j <= Q4->column_end;
+             m1_j++, j++)
+            matriz_C[i * n + j] = Q4->data[m1_i][m1_j];
+
+    return result;
 }
 
 /* This routine performs a dgemm operation
