@@ -84,6 +84,34 @@
             "program": "${workspaceRoot}/benchmark-blocked",
             "processId": "${command:pickProcess}",
             "MIMode": "gdb"
+        },
+        {
+            "name": "(gdb) Launch Strassen",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/benchmark-strassen",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceRoot}",
+            "environment": [],
+            "externalConsole": true,
+            "MIMode": "gdb",
+            "preLaunchTask": "build-debug",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "(gdb) Attach Strassen",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "${workspaceRoot}/benchmark-strassen",
+            "processId": "${command:pickProcess}",
+            "MIMode": "gdb"
         }
     ]
 }

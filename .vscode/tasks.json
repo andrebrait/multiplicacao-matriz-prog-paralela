@@ -14,7 +14,7 @@
         {
             "taskName": "build-debug",
             "type": "shell",
-            "command": "make CFLAGS:=\"$(CFLAGS) -ggdb\"",
+            "command": "make CFLAGS:=\"$(CFLAGS) -pg -ggdb\"",
             "problemMatcher": [
                 "$gcc"
             ]

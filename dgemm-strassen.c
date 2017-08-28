@@ -130,7 +130,7 @@ static matrix *multiply(matrix *restrict matrix_A, matrix *restrict matrix_B) {
     E->data = F->data = G->data = H->data = data_B;
 
     result->row_start = result->column_start = 0;
-    result->row_end = result->column_end = n - 1;
+    result->row_end = result->column_end = n;
 
     A->row_start = matrix_A->row_start;
     A->row_end = matrix_A->row_end / 2;
@@ -139,17 +139,17 @@ static matrix *multiply(matrix *restrict matrix_A, matrix *restrict matrix_B) {
 
     B->row_start = matrix_A->row_start;
     B->row_end = matrix_A->row_end / 2;
-    B->column_start = matrix_A->column_end / 2 + 1;
+    B->column_start = matrix_A->column_end / 2;
     B->column_end = matrix_A->column_end;
 
-    C->row_start = matrix_A->row_end / 2 + 1;
+    C->row_start = matrix_A->row_end / 2;
     C->row_end = matrix_A->row_end;
     C->column_start = matrix_A->column_start;
     C->column_end = matrix_A->column_end / 2;
 
-    D->row_start = matrix_A->row_end / 2 + 1;
+    D->row_start = matrix_A->row_end / 2;
     D->row_end = matrix_A->row_end;
-    D->column_start = matrix_A->column_end / 2 + 1;
+    D->column_start = matrix_A->column_end / 2;
     D->column_end = matrix_A->column_end;
 
     E->row_start = matrix_B->row_start;
@@ -159,17 +159,17 @@ static matrix *multiply(matrix *restrict matrix_A, matrix *restrict matrix_B) {
 
     F->row_start = matrix_B->row_start;
     F->row_end = matrix_B->row_end / 2;
-    F->column_start = matrix_B->column_end / 2 + 1;
+    F->column_start = matrix_B->column_end / 2;
     F->column_end = matrix_B->column_end;
 
-    G->row_start = matrix_B->row_end / 2 + 1;
+    G->row_start = matrix_B->row_end / 2;
     G->row_end = matrix_B->row_end;
     G->column_start = matrix_B->column_start;
     G->column_end = matrix_B->column_end / 2;
 
-    H->row_start = matrix_B->row_end / 2 + 1;
+    H->row_start = matrix_B->row_end / 2;
     H->row_end = matrix_B->row_end;
-    H->column_start = matrix_B->column_end / 2 + 1;
+    H->column_start = matrix_B->column_end / 2;
     H->column_end = matrix_B->column_end;
 
     P1 = multiply(A, minus(F, H));
@@ -187,25 +187,33 @@ static matrix *multiply(matrix *restrict matrix_A, matrix *restrict matrix_B) {
 
     double *restrict matriz_C = result->data;
 
-    for (m1_i = Q1->row_start, i = 0; m1_i <= Q1->row_end; m1_i++, i++)
-        for (m1_j = Q1->column_start, j = 0; m1_j <= Q1->column_end;
-             m1_j++, j++)
-            matriz_C[i * n + j] = Q1->data[m1_i][m1_j];
+    int size = Q1->row_end - Q1->row_start + 1;
 
-    for (m1_i = Q2->row_start, i = 0; m1_i <= Q2->row_end; m1_i++, i++)
-        for (m1_j = Q2->column_start, j = n / 2; m1_j <= Q2->column_end;
-             m1_j++, j++)
-            matriz_C[i * n + j] = Q2->data[m1_i][m1_j];
+    for (A_i = Q1->row_start, i = 0; A_i < Q1->row_end; A_i++, i++) {
+        for (A_j = Q1->column_start, j = 0; A_j < Q1->column_end; A_j++, j++) {
+            matriz_C[A_i * n + A_j] = Q1->data[i * size + j];
+        }
+    }
 
-    for (m1_i = Q3->row_start, i = n / 2; m1_i <= Q3->row_end; m1_i++, i++)
-        for (m1_j = Q3->column_start, j = 0; m1_j <= Q3->column_end;
-             m1_j++, j++)
-            matriz_C[i * n + j] = Q3->data[m1_i][m1_j];
+    for (A_i = Q2->row_start, i = 0; A_i < Q2->row_end; A_i++, i++) {
+        for (A_j = Q2->column_start, j = n / 2; A_j < Q2->column_end;
+             A_j++, j++) {
+            matriz_C[A_i * n + A_j] = Q2->data[i * size + j];
+        }
+    }
 
-    for (m1_i = Q4->row_start, i = n / 2; m1_i <= Q4->row_end; m1_i++, i++)
-        for (m1_j = Q4->column_start, j = n / 2; m1_j <= Q4->column_end;
-             m1_j++, j++)
-            matriz_C[i * n + j] = Q4->data[m1_i][m1_j];
+    for (A_i = Q3->row_start, i = n / 2; A_i < Q3->row_end; A_i++, i++) {
+        for (A_j = Q3->column_start, j = 0; A_j < Q3->column_end; A_j++, j++) {
+            matriz_C[i * n + j] = Q3->data[i * size + j];
+        }
+    }
+
+    for (A_i = Q4->row_start, i = n / 2; A_i <= Q4->row_end; A_i++, i++) {
+        for (A_j = Q4->column_start, j = n / 2; A_j <= Q4->column_end;
+             A_j++, j++) {
+            matriz_C[A_i * n + A_j] = Q4->data[i * size + j];
+        }
+    }
 
     return result;
 }
@@ -217,6 +225,25 @@ static matrix *multiply(matrix *restrict matrix_A, matrix *restrict matrix_B) {
 void square_dgemm(int n, double *restrict mat_A, double *restrict mat_B,
                   double *restrict mat_C) {
     int lda = next_power_of_two(n);
-    matrix matrix_A = {0, lda - 1, 0, lda - 1, mat_A};
-    matrix matrix_B = {0, lda - 1, 0, lda - 1, mat_B};
+    double *restrict data_A = (double *)(calloc(lda * lda, sizeof(double)));
+    double *restrict data_B = (double *)(calloc(lda * lda, sizeof(double)));
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            int pos_n = i * n + j;
+            int pos_lda = i * lda + j;
+            data_A[pos_lda] = mat_A[pos_n];
+            data_B[pos_lda] = mat_B[pos_n];
+        }
+    }
+    matrix matrix_A = {0, lda - 1, 0, lda - 1, data_A};
+    matrix matrix_B = {0, lda - 1, 0, lda - 1, data_B};
+    matrix *matrix_C = multiply(&matrix_A, &matrix_B);
+    double *restrict data_C = matrix_C->data;
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            int pos_n = i * n + j;
+            int pos_lda = i * lda + j;
+            mat_C[pos_n] = data_C[pos_lda];
+        }
+    }
 }
