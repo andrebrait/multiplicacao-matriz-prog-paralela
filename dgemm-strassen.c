@@ -17,23 +17,22 @@ static int next_power_of_two(int n) {
 }
 
 static m *plus(m *restrict mat_A, m *restrict mat_B) {
+    int i, j, A_i, A_j, B_i, B_j;
+
     int n = mat_A->re - mat_A->rs + 1;
     m *restrict mat_C = (m *)(malloc(sizeof(m)));
     mat_C->rs = mat_C->cs = 0;
     mat_C->re = mat_C->ce = n - 1;
     mat_C->d = (double *)(malloc(n * n * sizeof(double)));
 
-    int A_i = mat_A->rs;
-    int A_j = mat_A->cs;
-    int B_i = mat_B->rs;
-    int B_j = mat_B->cs;
-
     double *restrict A = mat_A->d;
     double *restrict B = mat_B->d;
     double *restrict C = mat_C->d;
 
-    for (int i = 0; A_i <= mat_A->re; A_i++, B_i++, i++) {
-        for (int j = 0; A_j <= mat_A->ce; A_j++, B_j++, j++) {
+    for (i = 0, A_i = mat_A->rs, B_i = mat_B->rs; A_i <= mat_A->re;
+         A_i++, B_i++, i++) {
+        for (j = 0, A_j = mat_A->cs, B_j = mat_B->cs; A_j <= mat_A->ce;
+             A_j++, B_j++, j++) {
             C[i * n + j] = A[A_i * n + A_j] + B[B_i * n + B_j];
         }
     }
@@ -42,23 +41,22 @@ static m *plus(m *restrict mat_A, m *restrict mat_B) {
 }
 
 static m *minus(m *restrict mat_A, m *restrict mat_B) {
+    int i, j, A_i, A_j, B_i, B_j;
+
     int n = mat_A->re - mat_A->rs + 1;
     m *restrict mat_C = (m *)(malloc(sizeof(m)));
     mat_C->rs = mat_C->cs = 0;
     mat_C->re = mat_C->ce = n - 1;
     mat_C->d = (double *)(malloc(n * n * sizeof(double)));
 
-    int A_i = mat_A->rs;
-    int A_j = mat_A->cs;
-    int B_i = mat_B->rs;
-    int B_j = mat_B->cs;
-
     double *restrict A = mat_A->d;
     double *restrict B = mat_B->d;
     double *restrict C = mat_C->d;
 
-    for (int i = 0; A_i <= mat_A->re; A_i++, B_i++, i++) {
-        for (int j = 0; A_j <= mat_A->ce; A_j++, B_j++, j++) {
+    for (i = 0, A_i = mat_A->rs, B_i = mat_B->rs; A_i <= mat_A->re;
+         A_i++, B_i++, i++) {
+        for (j = 0, A_j = mat_A->cs, B_j = mat_B->cs; A_j <= mat_A->ce;
+             A_j++, B_j++, j++) {
             C[i * n + j] = A[A_i * n + A_j] - B[B_i * n + B_j];
         }
     }
@@ -101,7 +99,7 @@ static m *multiply(m *restrict mat_A, m *restrict mat_B) {
             *restrict P6, *restrict P7;
         m *restrict Q1, *restrict Q2, *restrict Q3, *restrict Q4;
         m *restrict res;
-        int A_i, A_j;
+        int Q_i, Q_j;
         int i, j;
 
         A = (m *)(malloc(sizeof(m)));
@@ -194,27 +192,27 @@ static m *multiply(m *restrict mat_A, m *restrict mat_B) {
 
         int size = Q1->re - Q1->rs + 1;
 
-        for (A_i = Q1->rs, i = 0; A_i <= Q1->re; A_i++, i++) {
-            for (A_j = Q1->cs, j = 0; A_j <= Q1->ce; A_j++, j++) {
-                m_C[i * n + j] = Q1->d[A_i * size + A_j];
+        for (Q_i = Q1->rs, i = 0; Q_i <= Q1->re; Q_i++, i++) {
+            for (Q_j = Q1->cs, j = 0; Q_j <= Q1->ce; Q_j++, j++) {
+                m_C[i * n + j] = Q1->d[Q_i * size + Q_j];
             }
         }
 
-        for (A_i = Q2->rs, i = 0; A_i <= Q2->re; A_i++, i++) {
-            for (A_j = Q2->cs, j = n / 2; A_j <= Q2->ce; A_j++, j++) {
-                m_C[i * n + j] = Q2->d[A_i * size + A_j];
+        for (Q_i = Q2->rs, i = 0; Q_i <= Q2->re; Q_i++, i++) {
+            for (Q_j = Q2->cs, j = n / 2; Q_j <= Q2->ce; Q_j++, j++) {
+                m_C[i * n + j] = Q2->d[Q_i * size + Q_j];
             }
         }
 
-        for (A_i = Q3->rs, i = n / 2; A_i <= Q3->re; A_i++, i++) {
-            for (A_j = Q3->cs, j = 0; A_j <= Q3->ce; A_j++, j++) {
-                m_C[i * n + j] = Q3->d[A_i * size + A_j];
+        for (Q_i = Q3->rs, i = n / 2; Q_i <= Q3->re; Q_i++, i++) {
+            for (Q_j = Q3->cs, j = 0; Q_j <= Q3->ce; Q_j++, j++) {
+                m_C[i * n + j] = Q3->d[Q_i * size + Q_j];
             }
         }
 
-        for (A_i = Q4->rs, i = n / 2; A_i <= Q4->re; A_i++, i++) {
-            for (A_j = Q4->cs, j = n / 2; A_j <= Q4->ce; A_j++, j++) {
-                m_C[i * n + j] = Q4->d[A_i * size + A_j];
+        for (Q_i = Q4->rs, i = n / 2; Q_i <= Q4->re; Q_i++, i++) {
+            for (Q_j = Q4->cs, j = n / 2; Q_j <= Q4->ce; Q_j++, j++) {
+                m_C[i * n + j] = Q4->d[Q_i * size + Q_j];
             }
         }
 
