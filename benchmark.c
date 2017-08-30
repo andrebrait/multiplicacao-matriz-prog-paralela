@@ -163,6 +163,7 @@ int main(int argc, char **argv) {
          * square_dgemm */
         for (int i = 0; i < n * n; ++i) {
             if (C[i] > 0) {
+                free(buf);
                 die("*** FAILURE *** Error in matrix multiply exceeds "
                     "componentwise error bounds.\n");
             }

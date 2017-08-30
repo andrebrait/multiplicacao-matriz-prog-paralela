@@ -74,7 +74,7 @@ static m *multiply(m *restrict mat_A, m *restrict mat_B) {
     double *restrict m_B = mat_B->d;
     double *restrict m_C = mat_C->d;
 
-    if (n == 2) {
+    if (n <= 2) {
         double a, b, c, d, e, f, g, h;
 
         a = m_A[mat_A->rs * n + mat_A->cs];
@@ -86,17 +86,19 @@ static m *multiply(m *restrict mat_A, m *restrict mat_B) {
         g = m_B[mat_B->re * n + mat_B->cs];
         h = m_B[mat_B->re * n + mat_B->ce];
 
-        m_C[0] = a * e + b * g;
-        m_C[1] = a * f + b * h;
-        m_C[2] = c * e + d * g;
-        m_C[3] = c * f + d * h;
-    } else if (n == 1) {
-        m_C[0] = m_A[0] * m_B[0];
+        m_C[mat_C->rs * n + mat_C->cs] = a * e + b * g;
+        m_C[mat_C->rs * n + mat_C->ce] = a * f + b * h;
+        m_C[mat_C->re * n + mat_C->cs] = c * e + d * g;
+        m_C[mat_C->re * n + mat_C->ce] = c * f + d * h;
     } else {
         m *restrict A, *restrict B, *restrict C, *restrict D, *restrict E,
-            *restrict F, *restrict G, *restrict H;
+            *restrict F, *restrict G, *restrict H, *restrict temp_I,
+            *restrict temp_J, *restrict temp_K, *restrict temp_L,
+            *restrict temp_M, *restrict temp_N, *restrict temp_O,
+            *restrict temp_P, *restrict temp_Q, *restrict temp_R;
         m *restrict P1, *restrict P2, *restrict P3, *restrict P4, *restrict P5,
-            *restrict P6, *restrict P7;
+            *restrict P6, *restrict P7, *restrict temp_P8, *restrict temp_P9,
+            *restrict temp_P10, *restrict temp_P11;
         m *restrict Q1, *restrict Q2, *restrict Q3, *restrict Q4;
         m *restrict res;
         int Q_i, Q_j;
@@ -154,41 +156,70 @@ static m *multiply(m *restrict mat_A, m *restrict mat_B) {
         H->cs = (mat_B->ce - mat_B->cs) / 2 + mat_B->cs + 1;
         H->ce = mat_B->ce;
 
-        P1 = multiply(A, minus(F, H));
-        P2 = multiply(plus(A, B), H);
-        P3 = multiply(plus(C, D), E);
-        P4 = multiply(D, minus(G, E));
-        P5 = multiply(plus(A, D), plus(E, H));
-        P6 = multiply(minus(B, D), plus(G, H));
-        P7 = multiply(minus(A, C), plus(E, F));
+        P1 = multiply(A, temp_I = minus(F, H));
+        P2 = multiply(temp_J = plus(A, B), H);
+        P3 = multiply(temp_K = plus(C, D), E);
+        P4 = multiply(D, temp_L = minus(G, E));
+        P5 = multiply(temp_M = plus(A, D), temp_N = plus(E, H));
+        P6 = multiply(temp_O = minus(B, D), temp_P = plus(G, H));
+        P7 = multiply(temp_Q = minus(A, C), temp_R = plus(E, F));
 
-        // free(A);
-        // free(B);
-        // free(C);
-        // free(D);
-        // free(E);
-        // free(F);
-        // free(G);
+        free(A);
+        free(B);
+        free(C);
+        free(D);
+        free(E);
+        free(F);
+        free(G);
+        free(H);
+        free(temp_I->d);
+        free(temp_J->d);
+        free(temp_K->d);
+        free(temp_L->d);
+        free(temp_M->d);
+        free(temp_N->d);
+        free(temp_O->d);
+        free(temp_P->d);
+        free(temp_Q->d);
+        free(temp_R->d);
+        free(temp_I);
+        free(temp_J);
+        free(temp_K);
+        free(temp_L);
+        free(temp_M);
+        free(temp_N);
+        free(temp_O);
+        free(temp_P);
+        free(temp_Q);
+        free(temp_R);
 
-        Q1 = plus(minus(plus(P5, P4), P2), P6);
+        Q1 = plus(temp_P9 = minus(temp_P8 = plus(P5, P4), P2), P6);
         Q2 = plus(P1, P2);
         Q3 = plus(P3, P4);
-        Q4 = minus(minus(plus(P1, P5), P3), P7);
+        Q4 = minus(temp_P11 = minus(temp_P10 = plus(P1, P5), P3), P7);
 
-        // free(P1->d);
-        // free(P2->d);
-        // free(P3->d);
-        // free(P4->d);
-        // free(P5->d);
-        // free(P6->d);
-        // free(P7->d);
-        // free(P1);
-        // free(P2);
-        // free(P3);
-        // free(P4);
-        // free(P5);
-        // free(P6);
-        // free(P7);
+        free(P1->d);
+        free(P2->d);
+        free(P3->d);
+        free(P4->d);
+        free(P5->d);
+        free(P6->d);
+        free(P7->d);
+        free(P1);
+        free(P2);
+        free(P3);
+        free(P4);
+        free(P5);
+        free(P6);
+        free(P7);
+        free(temp_P8->d);
+        free(temp_P9->d);
+        free(temp_P10->d);
+        free(temp_P11->d);
+        free(temp_P8);
+        free(temp_P9);
+        free(temp_P10);
+        free(temp_P11);
 
         int size = Q1->re - Q1->rs + 1;
 
@@ -216,14 +247,14 @@ static m *multiply(m *restrict mat_A, m *restrict mat_B) {
             }
         }
 
-        // free(Q1->d);
-        // free(Q2->d);
-        // free(Q3->d);
-        // free(Q4->d);
-        // free(Q1);
-        // free(Q2);
-        // free(Q3);
-        // free(Q4);
+        free(Q1->d);
+        free(Q2->d);
+        free(Q3->d);
+        free(Q4->d);
+        free(Q1);
+        free(Q2);
+        free(Q3);
+        free(Q4);
     }
     return mat_C;
 }
@@ -254,8 +285,8 @@ void square_dgemm(int n, double *restrict A, double *restrict B,
     m mat_B = {0, lda - 1, 0, lda - 1, d_B};
     m *mat_C = multiply(&mat_A, &mat_B);
 
-    // free(mat_A.d);
-    // free(mat_B.d);
+    free(mat_A.d);
+    free(mat_B.d);
 
     double *restrict d_C = mat_C->d;
     for (int i = 0; i < n; i++) {
@@ -266,6 +297,6 @@ void square_dgemm(int n, double *restrict A, double *restrict B,
         }
     }
 
-    // free(m_C->d);
-    // free(m_C);
+    free(mat_C->d);
+    free(mat_C);
 }
