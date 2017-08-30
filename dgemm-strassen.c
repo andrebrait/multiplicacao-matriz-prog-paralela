@@ -1,176 +1,180 @@
 #include <math.h>
 #include <stdlib.h>
 
-const char *dgemm_desc = "Strassen divide and conquer dgemm.";
-
 #if !defined(BLOCK_SIZE)
 #define BLOCK_SIZE 41
 #endif
 
-typedef struct _matrix {
-    int row_start, row_end, column_start, column_end;
-    double *data;
-} matrix;
+const char *dgemm_desc = "Strassen divide and conquer dgemm.";
+
+typedef struct _m {
+    int rs, re, cs, ce;
+    double *d;
+} m;
 
 static int next_power_of_two(int n) {
     return (int)(pow(2, ceil(log((double)n) / log(2.0))));
 }
 
-static matrix *plus(matrix *restrict matrix_A, matrix *restrict matrix_B) {
-    matrix *restrict result = (matrix *)(malloc(sizeof(matrix)));
-    int A_i = matrix_A->row_start;
-    int A_j = matrix_A->column_start;
-    int B_i = matrix_B->row_start;
-    int B_j = matrix_B->column_start;
-    int n = matrix_A->row_end - matrix_A->row_start + 1;
-    result->data = (double *)(malloc(n * n * sizeof(double)));
+static m *plus(m *restrict m_A, m *restrict m_B) {
+    int n = m_A->re - m_A->rs + 1;
+    m *restrict res = (m *)(malloc(sizeof(m)));
+    res->rs = res->cs = 0;
+    res->re = res->ce = n - 1;
+    res->d = (double *)(malloc(n * n * sizeof(double)));
 
-    result->row_start = result->column_start = 0;
-    result->row_end = result->column_end = n - 1;
+    int A_i = m_A->rs;
+    int A_j = m_A->cs;
+    int B_i = m_B->rs;
+    int B_j = m_B->cs;
 
-    double *restrict A = matrix_A->data;
-    double *restrict B = matrix_B->data;
-    double *restrict C = result->data;
+    double *restrict A = m_A->d;
+    double *restrict B = m_B->d;
+    double *restrict C = res->d;
 
-    for (int i = 0; A_i < matrix_A->row_end; A_i++, B_i++, i++) {
-        for (int j = 0; A_j < matrix_A->column_end; A_j++, B_j++, j++) {
+    for (int i = 0; A_i <= m_A->re; A_i++, B_i++, i++) {
+        for (int j = 0; A_j <= m_A->ce; A_j++, B_j++, j++) {
             C[i * n + j] = A[A_i * n + A_j] + B[B_i * n + B_j];
         }
     }
 
-    return result;
+    return res;
 }
 
-static matrix *minus(matrix *restrict matrix_A, matrix *restrict matrix_B) {
-    matrix *restrict result = (matrix *)(malloc(sizeof(matrix)));
-    int A_i = matrix_A->row_start;
-    int A_j = matrix_A->column_start;
-    int B_i = matrix_B->row_start;
-    int B_j = matrix_B->column_start;
-    int n = matrix_A->row_end - matrix_A->row_start + 1;
-    result->data = (double *)(malloc(n * n * sizeof(double)));
+static m *minus(m *restrict m_A, m *restrict m_B) {
+    int n = m_A->re - m_A->rs + 1;
+    m *restrict res = (m *)(malloc(sizeof(m)));
+    res->rs = res->cs = 0;
+    res->re = res->ce = n - 1;
+    res->d = (double *)(malloc(n * n * sizeof(double)));
 
-    result->row_start = result->column_start = 0;
-    result->row_end = result->column_end = n - 1;
+    int A_i = m_A->rs;
+    int A_j = m_A->cs;
+    int B_i = m_B->rs;
+    int B_j = m_B->cs;
 
-    double *restrict A = matrix_A->data;
-    double *restrict B = matrix_B->data;
-    double *restrict C = result->data;
+    double *restrict A = m_A->d;
+    double *restrict B = m_B->d;
+    double *restrict C = res->d;
 
-    for (int i = 0; A_i < matrix_A->row_end; A_i++, B_i++, i++) {
-        for (int j = 0; A_j < matrix_A->column_end; A_j++, B_j++, j++) {
+    for (int i = 0; A_i <= m_A->re; A_i++, B_i++, i++) {
+        for (int j = 0; A_j <= m_A->ce; A_j++, B_j++, j++) {
             C[i * n + j] = A[A_i * n + A_j] - B[B_i * n + B_j];
         }
     }
 
-    return result;
+    return res;
 }
 
-static matrix *multiply(matrix *restrict matrix_A, matrix *restrict matrix_B) {
-    int n = matrix_A->row_end - matrix_A->row_start + 1;
-    if (n == 2) {
+static m *multiply(m *restrict m_A, m *restrict m_B) {
+    int n = m_A->re - m_A->rs + 1;
+    if (n <= 2) {
         double a, b, c, d, e, f, g, h;
-        matrix *matrix_C = (matrix *)(malloc(sizeof(matrix)));
-        matrix_C->data = (double *)(malloc(sizeof(n * n * sizeof(double))));
+        m *restrict m_C = (m *)(malloc(sizeof(m)));
+        m_C->rs = m_A->rs;
+        m_C->re = m_A->re;
+        m_C->cs = m_A->cs;
+        m_C->ce = m_A->ce;
+        m_C->d = (double *)(malloc(n * n * sizeof(double)));
 
-        double *restrict A = matrix_A->data;
-        double *restrict B = matrix_B->data;
-        double *restrict C = matrix_C->data;
+        double *restrict A = m_A->d;
+        double *restrict B = m_B->d;
+        double *restrict C = m_C->d;
 
-        int A_line_start_idx = matrix_A->row_start * n;
-        int A_line_end_idx = A_line_start_idx + n;
-        int B_line_start_idx = matrix_B->row_start * n;
-        int B_line_end_idx = B_line_start_idx + n;
-        int A_column_start_idx = matrix_A->column_start;
-        int A_column_end_idx = matrix_A->column_start + 1;
-        int B_column_start_idx = matrix_B->column_start;
-        int B_column_end_idx = matrix_B->column_start + 1;
+        int A_line_start_idx = m_A->rs * n;
+        int A_line_end_idx = m_A->rs * n + n - 1;
+        int B_line_start_idx = m_B->rs * n;
+        int B_line_end_idx = m_B->rs * n + n - 1;
+        int A_cs_idx = m_A->cs;
+        int A_ce_idx = m_A->cs + 1;
+        int B_cs_idx = m_B->cs;
+        int B_ce_idx = m_B->cs + 1;
 
-        a = A[A_line_start_idx + A_column_start_idx];
-        b = A[A_line_start_idx + A_column_end_idx];
-        c = A[A_line_end_idx + A_column_start_idx];
-        d = A[A_line_end_idx + A_column_end_idx];
-        e = B[B_line_start_idx + B_column_start_idx];
-        f = B[B_line_start_idx + B_column_end_idx];
-        g = B[B_line_end_idx + B_column_start_idx];
-        h = B[B_line_end_idx + B_column_end_idx];
+        a = A[A_line_start_idx + A_cs_idx];
+        b = A[A_line_start_idx + A_ce_idx];
+        c = A[A_line_end_idx + A_cs_idx];
+        d = A[A_line_end_idx + A_ce_idx];
+        e = B[B_line_start_idx + B_cs_idx];
+        f = B[B_line_start_idx + B_ce_idx];
+        g = B[B_line_end_idx + B_cs_idx];
+        h = B[B_line_end_idx + B_ce_idx];
 
-        C[A_line_start_idx + A_column_start_idx] = a * e + b * g;
-        C[A_line_start_idx + A_column_end_idx] = a * f + b * h;
-        C[A_line_end_idx + A_column_start_idx] = c * e + d * g;
-        C[A_line_end_idx + A_column_end_idx] = c * f + d * h;
+        C[A_line_start_idx + A_cs_idx] = a * e + b * g;
+        C[A_line_start_idx + A_ce_idx] = a * f + b * h;
+        C[A_line_end_idx + A_cs_idx] = c * e + d * g;
+        C[A_line_end_idx + A_ce_idx] = c * f + d * h;
 
-        return matrix_C;
+        return m_C;
     }
 
-    double *restrict data_A = matrix_A->data;
-    double *restrict data_B = matrix_B->data;
+    double *restrict d_A = m_A->d;
+    double *restrict d_B = m_B->d;
 
-    matrix *restrict A, *restrict B, *restrict C, *restrict D, *restrict E,
+    m *restrict A, *restrict B, *restrict C, *restrict D, *restrict E,
         *restrict F, *restrict G, *restrict H;
-    matrix *restrict P1, *restrict P2, *restrict P3, *restrict P4, *restrict P5,
+    m *restrict P1, *restrict P2, *restrict P3, *restrict P4, *restrict P5,
         *restrict P6, *restrict P7;
-    matrix *restrict Q1, *restrict Q2, *restrict Q3, *restrict Q4;
-    matrix *restrict result;
+    m *restrict Q1, *restrict Q2, *restrict Q3, *restrict Q4;
+    m *restrict res;
     int A_i, A_j;
     int i, j;
 
-    A = (matrix *)(malloc(sizeof(matrix)));
-    B = (matrix *)(malloc(sizeof(matrix)));
-    C = (matrix *)(malloc(sizeof(matrix)));
-    D = (matrix *)(malloc(sizeof(matrix)));
-    E = (matrix *)(malloc(sizeof(matrix)));
-    F = (matrix *)(malloc(sizeof(matrix)));
-    G = (matrix *)(malloc(sizeof(matrix)));
-    H = (matrix *)(malloc(sizeof(matrix)));
-    result = (matrix *)(malloc(sizeof(matrix)));
-    result->data = (double *)(malloc(n * n * sizeof(double)));
+    A = (m *)(malloc(sizeof(m)));
+    B = (m *)(malloc(sizeof(m)));
+    C = (m *)(malloc(sizeof(m)));
+    D = (m *)(malloc(sizeof(m)));
+    E = (m *)(malloc(sizeof(m)));
+    F = (m *)(malloc(sizeof(m)));
+    G = (m *)(malloc(sizeof(m)));
+    H = (m *)(malloc(sizeof(m)));
+    res = (m *)(malloc(sizeof(m)));
+    res->d = (double *)(malloc(n * n * sizeof(double)));
 
-    A->data = B->data = C->data = D->data = data_A;
-    E->data = F->data = G->data = H->data = data_B;
+    A->d = B->d = C->d = D->d = d_A;
+    E->d = F->d = G->d = H->d = d_B;
 
-    result->row_start = result->column_start = 0;
-    result->row_end = result->column_end = n;
+    res->rs = res->cs = 0;
+    res->re = res->ce = n - 1;
 
-    A->row_start = matrix_A->row_start;
-    A->row_end = matrix_A->row_end / 2;
-    A->column_start = matrix_A->column_start;
-    A->column_end = matrix_A->column_end / 2;
+    A->rs = m_A->rs;
+    A->re = (m_A->re - m_A->rs) / 2 + m_A->rs;
+    A->cs = m_A->cs;
+    A->ce = (m_A->ce - m_A->cs) / 2 + m_A->cs;
 
-    B->row_start = matrix_A->row_start;
-    B->row_end = matrix_A->row_end / 2;
-    B->column_start = matrix_A->column_end / 2;
-    B->column_end = matrix_A->column_end;
+    B->rs = m_A->rs;
+    B->re = (m_A->re - m_A->rs) / 2 + m_A->rs;
+    B->cs = (m_A->ce - m_A->cs) / 2 + m_A->cs + 1;
+    B->ce = m_A->ce;
 
-    C->row_start = matrix_A->row_end / 2;
-    C->row_end = matrix_A->row_end;
-    C->column_start = matrix_A->column_start;
-    C->column_end = matrix_A->column_end / 2;
+    C->rs = (m_A->re - m_A->rs) / 2 + m_A->rs + 1;
+    C->re = m_A->re;
+    C->cs = m_A->cs;
+    C->ce = (m_A->ce - m_A->cs) / 2 + m_A->cs;
 
-    D->row_start = matrix_A->row_end / 2;
-    D->row_end = matrix_A->row_end;
-    D->column_start = matrix_A->column_end / 2;
-    D->column_end = matrix_A->column_end;
+    D->rs = (m_A->re - m_A->rs) / 2 + m_A->rs + 1;
+    D->re = m_A->re;
+    D->cs = (m_A->ce - m_A->cs) / 2 + m_A->cs + 1;
+    D->ce = m_A->ce;
 
-    E->row_start = matrix_B->row_start;
-    E->row_end = matrix_B->row_end / 2;
-    E->column_start = matrix_B->column_start;
-    E->column_end = matrix_B->column_end / 2;
+    E->rs = m_B->rs;
+    E->re = (m_B->re - m_B->rs) / 2 + m_B->rs;
+    E->cs = m_B->cs;
+    E->ce = (m_B->ce - m_B->cs) / 2 + m_B->cs;
 
-    F->row_start = matrix_B->row_start;
-    F->row_end = matrix_B->row_end / 2;
-    F->column_start = matrix_B->column_end / 2;
-    F->column_end = matrix_B->column_end;
+    F->rs = m_B->rs;
+    F->re = (m_B->re - m_B->rs) / 2 + m_B->rs;
+    F->cs = (m_B->ce - m_B->cs) / 2 + m_B->cs + 1;
+    F->ce = m_B->ce;
 
-    G->row_start = matrix_B->row_end / 2;
-    G->row_end = matrix_B->row_end;
-    G->column_start = matrix_B->column_start;
-    G->column_end = matrix_B->column_end / 2;
+    G->rs = (m_B->re - m_B->rs) / 2 + m_B->rs + 1;
+    G->re = m_B->re;
+    G->cs = m_B->cs;
+    G->ce = (m_B->ce - m_B->cs) / 2 + m_B->cs;
 
-    H->row_start = matrix_B->row_end / 2;
-    H->row_end = matrix_B->row_end;
-    H->column_start = matrix_B->column_end / 2;
-    H->column_end = matrix_B->column_end;
+    H->rs = (m_B->re - m_B->rs) / 2 + m_B->rs + 1;
+    H->re = m_B->re;
+    H->cs = (m_B->ce - m_B->cs) / 2 + m_B->cs + 1;
+    H->ce = m_B->ce;
 
     P1 = multiply(A, minus(F, H));
     P2 = multiply(plus(A, B), H);
@@ -180,42 +184,72 @@ static matrix *multiply(matrix *restrict matrix_A, matrix *restrict matrix_B) {
     P6 = multiply(minus(B, D), plus(G, H));
     P7 = multiply(minus(A, C), plus(E, F));
 
+    // free(A);
+    // free(B);
+    // free(C);
+    // free(D);
+    // free(E);
+    // free(F);
+    // free(G);
+
     Q1 = plus(minus(plus(P5, P4), P2), P6);
     Q2 = plus(P1, P2);
     Q3 = plus(P3, P4);
     Q4 = minus(minus(plus(P1, P5), P3), P7);
 
-    double *restrict matriz_C = result->data;
+    // free(P1->d);
+    // free(P2->d);
+    // free(P3->d);
+    // free(P4->d);
+    // free(P5->d);
+    // free(P6->d);
+    // free(P7->d);
+    // free(P1);
+    // free(P2);
+    // free(P3);
+    // free(P4);
+    // free(P5);
+    // free(P6);
+    // free(P7);
 
-    int size = Q1->row_end - Q1->row_start + 1;
+    double *restrict m_C = res->d;
 
-    for (A_i = Q1->row_start, i = 0; A_i < Q1->row_end; A_i++, i++) {
-        for (A_j = Q1->column_start, j = 0; A_j < Q1->column_end; A_j++, j++) {
-            matriz_C[A_i * n + A_j] = Q1->data[i * size + j];
+    int size = Q1->re - Q1->rs + 1;
+
+    for (A_i = Q1->rs, i = 0; A_i <= Q1->re; A_i++, i++) {
+        for (A_j = Q1->cs, j = 0; A_j <= Q1->ce; A_j++, j++) {
+            m_C[A_i * n + A_j] = Q1->d[i * size + j];
         }
     }
 
-    for (A_i = Q2->row_start, i = 0; A_i < Q2->row_end; A_i++, i++) {
-        for (A_j = Q2->column_start, j = n / 2; A_j < Q2->column_end;
-             A_j++, j++) {
-            matriz_C[A_i * n + A_j] = Q2->data[i * size + j];
+    for (A_i = Q2->rs, i = 0; A_i <= Q2->re; A_i++, i++) {
+        for (A_j = Q2->cs, j = n / 2; A_j <= Q2->ce; A_j++, j++) {
+            m_C[A_i * n + A_j] = Q2->d[i * size + j];
         }
     }
 
-    for (A_i = Q3->row_start, i = n / 2; A_i < Q3->row_end; A_i++, i++) {
-        for (A_j = Q3->column_start, j = 0; A_j < Q3->column_end; A_j++, j++) {
-            matriz_C[i * n + j] = Q3->data[i * size + j];
+    for (A_i = Q3->rs, i = n / 2; A_i <= Q3->re; A_i++, i++) {
+        for (A_j = Q3->cs, j = 0; A_j <= Q3->ce; A_j++, j++) {
+            m_C[i * n + j] = Q3->d[i * size + j];
         }
     }
 
-    for (A_i = Q4->row_start, i = n / 2; A_i <= Q4->row_end; A_i++, i++) {
-        for (A_j = Q4->column_start, j = n / 2; A_j <= Q4->column_end;
-             A_j++, j++) {
-            matriz_C[A_i * n + A_j] = Q4->data[i * size + j];
+    for (A_i = Q4->rs, i = n / 2; A_i <= Q4->re; A_i++, i++) {
+        for (A_j = Q4->cs, j = n / 2; A_j <= Q4->ce; A_j++, j++) {
+            m_C[A_i * n + A_j] = Q4->d[i * size + j];
         }
     }
 
-    return result;
+    // free(Q1->d);
+    // free(Q2->d);
+    // free(Q3->d);
+    // free(Q4->d);
+    // free(Q1);
+    // free(Q2);
+    // free(Q3);
+    // free(Q4);
+
+    return res;
 }
 
 /* This routine performs a dgemm operation
@@ -225,25 +259,37 @@ static matrix *multiply(matrix *restrict matrix_A, matrix *restrict matrix_B) {
 void square_dgemm(int n, double *restrict mat_A, double *restrict mat_B,
                   double *restrict mat_C) {
     int lda = next_power_of_two(n);
-    double *restrict data_A = (double *)(calloc(lda * lda, sizeof(double)));
-    double *restrict data_B = (double *)(calloc(lda * lda, sizeof(double)));
+    double *restrict d_A = (double *)(malloc(lda * lda * sizeof(double)));
+    double *restrict d_B = (double *)(malloc(lda * lda * sizeof(double)));
+    for (int i = 0; i < lda; i++) {
+        for (int j = 0; j < lda; j++) {
+            int pos_lda = i * lda + j;
+            if (i < n && j < n) {
+                int pos_n = i * n + j;
+                d_A[pos_lda] = mat_A[pos_n];
+                d_B[pos_lda] = mat_B[pos_n];
+            } else {
+                d_A[pos_lda] = 0.0;
+                d_B[pos_lda] = 0.0;
+            }
+        }
+    }
+    m m_A = {0, lda - 1, 0, lda - 1, d_A};
+    m m_B = {0, lda - 1, 0, lda - 1, d_B};
+    m *m_C = multiply(&m_A, &m_B);
+
+    // free(m_A.d);
+    // free(m_B.d);
+
+    double *restrict d_C = m_C->d;
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             int pos_n = i * n + j;
             int pos_lda = i * lda + j;
-            data_A[pos_lda] = mat_A[pos_n];
-            data_B[pos_lda] = mat_B[pos_n];
+            mat_C[pos_n] = d_C[pos_lda];
         }
     }
-    matrix matrix_A = {0, lda - 1, 0, lda - 1, data_A};
-    matrix matrix_B = {0, lda - 1, 0, lda - 1, data_B};
-    matrix *matrix_C = multiply(&matrix_A, &matrix_B);
-    double *restrict data_C = matrix_C->data;
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            int pos_n = i * n + j;
-            int pos_lda = i * lda + j;
-            mat_C[pos_n] = data_C[pos_lda];
-        }
-    }
+
+    // free(m_C->d);
+    // free(m_C);
 }
