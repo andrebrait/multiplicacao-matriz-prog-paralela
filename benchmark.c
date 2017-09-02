@@ -70,25 +70,40 @@ void absolute_value(double *p, int n) {
 int main(int argc, char **argv) {
     printf("Description:\t%s\n\n", dgemm_desc);
 
-    /* Test sizes should highlight performance dips at multiples of certain
-     * powers-of-two */
+	/* If max_size has been passed as an argument, create test_sizes based on 
+	* log2(k) numbers between 1 and max_size. Otherwise, create constant matrix.
+    * Test sizes should highlight performance dips at multiples of certain
+    * powers-of-two */
+    int *test_sizes;
+    int common_size;
+	if(argc > 1) {
+		int max_size = atoi(argv[1]);
+		common_size = log2(max_size);
+		int i;
+		test_sizes = (int *) malloc(common_size * sizeof(int));
+		for(i = 0; i < common_size; i++)
+			test_sizes[i] = 1 << i;
+	} 
+	/* Multiples-of-32, +/- 1. Currently commented. */
+	/* {31, 32, 33, 63, 64, 65, 95, 96, 97, 127, 128, 129, 159, 160, 161, 191, 192, 193, 223, 224, 225, 255, 256, 257, 287, 288, 	 * 289, 319, 320, 321, 351, 352, 353, 383, 384, 385, 415, 416, 417, 447, 448, 449, 479, 480, 481, 511, 512, 513, 543, 544, 545, 		* 575, 576, 577, 607, 608, 609, 639, 640, 641, 671, 672, 673, 703, 704, 705, 735, 736, 737, 767, 768, 769, 799, 800, 801, 831, 		* 832, 833, 863, 864, 865, 895, 896, 897, 927, 928, 929, 959, 960, 961, 991, 992, 993, 1023, 1024, 1025};
+   */
+	else {
+		/* A representative subset of the first list. Currently uncommented. */
+		int values[] = {
+		    31,  32,  96,  97,  127, 128, 129, 191, 192, 229, 255, 256, 257,
+		    319, 320, 321, 417, 479, 480, 511, 512, 639, 640, 767, 768, 769
+   	 	};
+   	 	common_size = sizeof(values)/sizeof(int);
+   	 	test_sizes = (int *) malloc(common_size * sizeof(int));
+   	 	memcpy(test_sizes, values, common_size * sizeof(int));
+   	}
 
-    int test_sizes[] =
+    int nsizes = common_size;
 
-        /* Multiples-of-32, +/- 1. Currently commented. */
-        /* {31,32,33,63,64,65,95,96,97,127,128,129,159,160,161,191,192,193,223,224,225,255,256,257,287,288,289,319,320,321,351,352,353,383,384,385,415,416,417,447,448,449,479,480,481,511,512,513,543,544,545,575,576,577,607,608,609,639,640,641,671,672,673,703,704,705,735,736,737,767,768,769,799,800,801,831,832,833,863,864,865,895,896,897,927,928,929,959,960,961,991,992,993,1023,1024,1025};
-           */
-
-        /* A representative subset of the first list. Currently uncommented. */
-        {31,  32,  96,  97,  127, 128, 129, 191, 192, 229, 255, 256, 257,
-         319, 320, 321, 417, 479, 480, 511, 512, 639, 640, 767, 768, 769};
-
-    int nsizes = sizeof(test_sizes) / sizeof(test_sizes[0]);
-
-    /* assume last size is also the largest size */
+    /* Assume last size is also the largest size */
     int nmax = test_sizes[nsizes - 1];
 
-    /* allocate memory for all problems */
+    /* Allocate memory for all problems */
     double *buf = NULL;
     buf = (double *)malloc(3 * nmax * nmax * sizeof(double));
     if (buf == NULL) {
@@ -96,11 +111,9 @@ int main(int argc, char **argv) {
     }
 
     double Mflops_s[nsizes], per[nsizes], aveper;
-
     /* For each test size */
-    for (int isize = 0; isize < sizeof(test_sizes) / sizeof(test_sizes[0]);
-         ++isize) {
-        /* Create and fill 3 random matrices A,B,C*/
+    for (int isize = 0; isize < nsizes; ++isize) {
+        /* Create and fill 3 random matrices A, B, C*/
         int n = test_sizes[isize];
 
         double *A = buf + 0;
@@ -181,6 +194,6 @@ int main(int argc, char **argv) {
     printf("Average percentage of Peak = %g\n", aveper);
 
     free(buf);
-
+	free(test_sizes);
     return 0;
 }
