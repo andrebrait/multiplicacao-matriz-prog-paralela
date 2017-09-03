@@ -121,15 +121,15 @@ static void dgemm_strassen(double *restrict A, double *restrict B, double *restr
 	
 	for(i = 0; i < _n; i++) {
 		for(j = 0; j < _n; j++) {
-			A_11[j * _n + i] = A[j * _n + i];
-			A_12[j * _n + i] = A[(j + _n) * _n + i];
-			A_21[j * _n + i] = A[j * _n + (i + _n)];
-			A_22[j * _n + i] = A[(j + _n) * _n + (i + _n)];
+			A_11[j * _n + i] = A[j * n + i];
+			A_12[j * _n + i] = A[(j + _n) * n + i];
+			A_21[j * _n + i] = A[j * n + (i + _n)];
+			A_22[j * _n + i] = A[(j + _n) * n + (i + _n)];
 			
-			B_11[j * _n + i] = B[j * _n + i];
-			B_12[j * _n + i] = B[(j + _n) * _n + i];
-			B_21[j * _n + i] = B[j * _n + (i + _n)];
-			B_22[j * _n + i] = B[(j + _n) * _n + (i + _n)];
+			B_11[j * _n + i] = B[j * n + i];
+			B_12[j * _n + i] = B[(j + _n) * n + i];
+			B_21[j * _n + i] = B[j * n + (i + _n)];
+			B_22[j * _n + i] = B[(j + _n) * n + (i + _n)];
 		}
 	}
 	
@@ -170,10 +170,10 @@ static void dgemm_strassen(double *restrict A, double *restrict B, double *restr
 	
 	for(i = 0; i < _n; i++) {
 		for(j = 0; j < _n; j++) {
-			C[j * _n + i] = C_11[j * _n + i];
-			C[(j + _n) * _n + i] = C_12[j * _n + i];
-			C[j * _n + (i + _n)] = C_21[j * _n + i];
-			C[(j + _n) * _n + (i + _n)] = C_22[j * _n + i];
+			C[j * n + i] = C_11[j * _n + i];
+			C[(j + _n) * n + i] = C_12[j * _n + i];
+			C[j * n + (i + _n)] = C_21[j * _n + i];
+			C[(j + _n) * n + (i + _n)] = C_22[j * _n + i];
 		}
 	}
 	
@@ -238,6 +238,10 @@ static double *restrict createMatrixColumnMajor(int size) {
 	if(M == NULL) {
 		exit(1);
 	}
+	register int i;
+	for(i = 0; i < size * size; i++) {
+		M[i] = 0.0;
+	}
 	return M;
 }
 
@@ -258,4 +262,23 @@ static double *restrict freeMatrixColumnMajor(double *restrict M, int size) {
  * On exit, A and B maintain their input values. */
 void square_dgemm(int n, double *restrict A, double *restrict B, double *restrict C) {
 	int correctSize = next_power_of_two(n);
+	double *restrict Asized2 = createMatrixColumnMajor(correctSize);
+	double *restrict Bsized2 = createMatrixColumnMajor(correctSize);
+	double *restrict Csized2 = createMatrixColumnMajor(correctSize);
+	register int i, j;
+	for(i = 0; i < n; i++) {
+		for(j = 0; j < n; j++) {
+			Asized2[j * n + i] = A[j * n + i];
+			Bsized2[j * n + i] = B[j * n + i];
+		}
+	}
+	dgemm_strassen(Asized2, Bsized2, Csized2, correctSize);
+	for(i = 0; i < n; i++) {
+		for(j = 0; j < n; j++) {
+			C[j * n + i] = Csized2[j * n + i];
+		}
+	}
+	freeMatrixColumnMajor(Asized2, correctSize);
+	freeMatrixColumnMajor(Bsized2, correctSize);
+	freeMatrixColumnMajor(Csized2, correctSize);
 }
