@@ -1,5 +1,6 @@
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #if !defined(BLOCK_SIZE)
@@ -25,7 +26,7 @@ static double **freeMatrix(double **M, int size);
 * Returns the first value 2^k >= n.
 */
 static int next_power_of_two(int n) {
-    return (int)(pow(2, ceil(log((double)n) / log(2.0))));
+    return (int) (pow(2, ceil(log2( (double)n))));
 }
 
 /**
@@ -79,7 +80,7 @@ static int next_power_of_two(int n) {
 * ...and all corresponding expression to M2, M3, ... in order to compute
 * each submatrix of C.
 */
-void dgemm_strassen(double **A, double **B, double **C, int n) {
+static void dgemm_strassen(double **A, double **B, double **C, int n) {
 	if(n == 1) {
 		C[0][0] = A[0][0] * B[0][0];
 		return;
@@ -140,7 +141,7 @@ void dgemm_strassen(double **A, double **B, double **C, int n) {
 	dgemm_strassen(APartialResult, B_11, M2, _n);
 	
 	minus(B_12, B_22, BPartialResult, _n);
-	dgemm_strassen(A_22, BPartialResult, M3, _n);
+	dgemm_strassen(A_11, BPartialResult, M3, _n);
 	
 	minus(B_21, B_11, BPartialResult, _n);
 	dgemm_strassen(A_22, BPartialResult, M4, _n);
@@ -207,7 +208,7 @@ void dgemm_strassen(double **A, double **B, double **C, int n) {
 * Given two real matrices A and B, returns A + B where A, B and 
 * C are size x size.
 */
-void plus(double **A, double **B, double **A_plus_B, int size) {	
+static void plus(double **A, double **B, double **A_plus_B, int size) {	
 	register int i, j;
 	for(i = 0; i < size; i++) {
 		for(j = 0; j < size; j++) {
@@ -220,7 +221,7 @@ void plus(double **A, double **B, double **A_plus_B, int size) {
 * Given two real matrices A and B, returns A - B where A, B and
 * C are size x size.
 */
-void minus(double **A, double **B, double **A_minus_B, int size) {
+static void minus(double **A, double **B, double **A_minus_B, int size) {
 	register int i, j;
 	for(i = 0; i < size; i++) {
 		for(j = 0; j < size; j++) {
@@ -234,7 +235,7 @@ void minus(double **A, double **B, double **A_minus_B, int size) {
 * allocated, the program should be terminated. Otherwise, returns a
 * pointer to the created matrix's memory address.
 */
-double **createMatrix(int size) {
+static double **createMatrix(int size) {
 	double **M = (double **) malloc(sizeof(double *) * size);
 	if(M == NULL) {
 		exit(1);
@@ -243,6 +244,7 @@ double **createMatrix(int size) {
 	for(i = 0; i < size; i++) {
 		M[i] = (double *) malloc(sizeof(double) * size);
 		if(M[i] == NULL) {
+			printf("error\n");
 			exit(1);
 		}
 		memset(M[i], 0.0, sizeof(double) * size);
@@ -255,7 +257,7 @@ double **createMatrix(int size) {
 * pointer M, whose size must be size x size. Returns NULL in
 * case of success.
 */
-double **freeMatrix(double **M, int size) {
+static double **freeMatrix(double **M, int size) {
 	register int i;
 	if(M == NULL)
 		return NULL;
@@ -278,29 +280,20 @@ void square_dgemm(int n, double *restrict A, double *restrict B, double *restric
 	int correctSize = next_power_of_two(n);
 	double **Asized2;
 	double **Bsized2;
-	if(correctSize != n) {
-		Asized2 = createMatrix(correctSize);
-		Bsized2 = createMatrix(correctSize);
-		register int i, j;
-		for(i = 0; i < n; i++) {
-			for(j = 0; j < n; j++) {
-				Asized2[i][j] = A[i][j];
-				Bsized2[i][j] = B[i][j];
-			}
+	Asized2 = createMatrix(correctSize);
+	Bsized2 = createMatrix(correctSize);
+	register int i, j;
+	for(i = 0; i < n; i++) {
+		for(j = 0; j < n; j++) {
+			Asized2[i][j] = A[j * n + i];
+			Bsized2[i][j] = B[j * n + i];
 		}
-	}
-	else {
-		Asized2 = A;
-		Bsized2 = B;
 	}
 	double **Csized2 = createMatrix(correctSize);
 	dgemm_strassen(Asized2, Bsized2, Csized2, correctSize);
-	if(correctSize != n) {
-		register int i, j;
-		for(i = 0; i < n; i++) {
-			for(j = 0; j < n; j++) {
-				C[i][j] = Csized2[i][j];
-			}
+	for(i = 0; i < n; i++) {
+		for(j = 0; j < n; j++) {
+			C[j * n + i] = Csized2[i][j];
 		}
 	}
 }
