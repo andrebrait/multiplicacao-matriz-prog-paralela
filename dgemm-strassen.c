@@ -149,8 +149,8 @@ static void dgemm_strassen(double *restrict A, double *restrict B, double *restr
 	plus(A_11, A_12, APartialResult, _n);
 	dgemm_strassen(APartialResult, B_22, M5, _n);
 	
-	minus(A_21, A_11, APartialResult, _n);
 	plus(B_11, B_12, BPartialResult, _n);
+	minus(A_21, A_11, APartialResult, _n);
 	dgemm_strassen(APartialResult, BPartialResult, M6, _n);
 	
 	minus(A_12, A_22, APartialResult, _n);
@@ -239,9 +239,7 @@ static double *restrict createMatrixColumnMajor(int size) {
 		exit(1);
 	}
 	register int i;
-	for(i = 0; i < size * size; i++) {
-		M[i] = 0.0;
-	}
+	memset(M, 0.0, sizeof(double) * size * size);
 	return M;
 }
 
@@ -264,7 +262,6 @@ void square_dgemm(int n, double *restrict A, double *restrict B, double *restric
 	int correctSize = next_power_of_two(n);
 	double *restrict Asized2 = createMatrixColumnMajor(correctSize);
 	double *restrict Bsized2 = createMatrixColumnMajor(correctSize);
-	double *restrict Csized2 = createMatrixColumnMajor(correctSize);
 	register int i, j;
 	for(i = 0; i < n; i++) {
 		for(j = 0; j < n; j++) {
@@ -272,6 +269,7 @@ void square_dgemm(int n, double *restrict A, double *restrict B, double *restric
 			Bsized2[j * n + i] = B[j * n + i];
 		}
 	}
+	double *restrict Csized2 = createMatrixColumnMajor(correctSize);
 	dgemm_strassen(Asized2, Bsized2, Csized2, correctSize);
 	for(i = 0; i < n; i++) {
 		for(j = 0; j < n; j++) {
