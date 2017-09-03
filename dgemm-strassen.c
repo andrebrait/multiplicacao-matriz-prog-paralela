@@ -238,7 +238,6 @@ static double *restrict createMatrixColumnMajor(int size) {
 	if(M == NULL) {
 		exit(1);
 	}
-	register int i;
 	memset(M, 0.0, sizeof(double) * size * size);
 	return M;
 }
@@ -265,15 +264,23 @@ void square_dgemm(int n, double *restrict A, double *restrict B, double *restric
 	register int i, j;
 	for(i = 0; i < n; i++) {
 		for(j = 0; j < n; j++) {
-			Asized2[j * n + i] = A[j * n + i];
-			Bsized2[j * n + i] = B[j * n + i];
+			if(i >= n || j >= n) {
+				Asized2[j * n + i] = 0.0;
+				Bsized2[j * n + i] = 0.0;			
+			}
+			else {
+				Asized2[j * n + i] = A[j * n + i];
+				Bsized2[j * n + i] = B[j * n + i];
+			}
 		}
 	}
 	double *restrict Csized2 = createMatrixColumnMajor(correctSize);
 	dgemm_strassen(Asized2, Bsized2, Csized2, correctSize);
 	for(i = 0; i < n; i++) {
 		for(j = 0; j < n; j++) {
-			C[j * n + i] = Csized2[j * n + i];
+			if(i < n || j < n) {
+				C[j * n + i] = Csized2[j * n + i];				
+			}
 		}
 	}
 	freeMatrixColumnMajor(Asized2, correctSize);
