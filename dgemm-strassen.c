@@ -11,16 +11,22 @@ const char *dgemm_desc = "Strassen divide and conquer dgemm.";
 /**
 * Function signatures.
 */
-void dgemm_strassen(double **A, double **B, double **C, int n);
+static void dgemm_strassen(double **A, double **B, double **C, int n);
 
-void plus(double **A, double **B, double **A_plus_B, int size);
+static void plus(double **A, double **B, double **A_plus_B, int size);
 
+static void minus(double **A, double **B, double **A_minus_B, int size);
 
-void minus(double **A, double **B, double **A_minus_B, int size);
+static double **createMatrix(int size);
 
-double **createMatrix(int size);
+static double **freeMatrix(double **M, int size);
 
-double **freeMatrix(double **M, int size);
+/**
+* Returns the first value 2^k >= n.
+*/
+static int next_power_of_two(int n) {
+    return (int)(pow(2, ceil(log((double)n) / log(2.0))));
+}
 
 /**
 * Implementation of Strassen Algorithm for Matrices Multiplication. 
@@ -269,9 +275,32 @@ double **freeMatrix(double **M, int size) {
  * where A, B, and C are lda-by-lda matrices stored in column-major format.
  * On exit, A and B maintain their input values. */
 void square_dgemm(int n, double *restrict A, double *restrict B, double *restrict C) {
-	int correctSize;
-	int log2n = log2(n);
-	if((1 << log2n) != n) {
-		
+	int correctSize = next_power_of_two(n);
+	double **Asized2;
+	double **Bsized2;
+	if(correctSize != n) {
+		Asized2 = createMatrix(correctSize);
+		Bsized2 = createMatrix(correctSize);
+		register int i, j;
+		for(i = 0; i < n; i++) {
+			for(j = 0; j < n; j++) {
+				Asized2[i][j] = A[i][j];
+				Bsized2[i][j] = B[i][j];
+			}
+		}
+	}
+	else {
+		Asized2 = A;
+		Bsized2 = B;
+	}
+	double **Csized2 = createMatrix(correctSize);
+	dgemm_strassen(Asized2, Bsized2, Csized2, correctSize);
+	if(correctSize != n) {
+		register int i, j;
+		for(i = 0; i < n; i++) {
+			for(j = 0; j < n; j++) {
+				C[i][j] = Csized2[i][j];
+			}
+		}
 	}
 }
