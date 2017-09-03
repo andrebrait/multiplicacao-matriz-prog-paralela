@@ -15,6 +15,7 @@ void dgemm_strassen(double **A, double **B, double **C, int n);
 
 void plus(double **A, double **B, double **A_plus_B, int size);
 
+
 void minus(double **A, double **B, double **A_minus_B, int size);
 
 double **createMatrix(int size);
