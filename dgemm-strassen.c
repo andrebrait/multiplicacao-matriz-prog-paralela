@@ -1,5 +1,6 @@
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if !defined(BLOCK_SIZE)
 #define BLOCK_SIZE 41
@@ -7,296 +8,269 @@
 
 const char *dgemm_desc = "Strassen divide and conquer dgemm.";
 
-typedef struct _m {
-    int rs, re, cs, ce;
-    double *d;
-} m;
+/**
+* Function signatures.
+*/
+void dgemm_strassen(double **A, double **B, double **C, int n);
 
-static int next_power_of_two(int n) {
-    return (int)(pow(2, ceil(log((double)n) / log(2.0))));
+void plus(double **A, double **B, double **A_plus_B, int size);
+
+void minus(double **A, double **B, double **A_minus_B, int size);
+
+double **createMatrix(int size);
+
+double **freeMatrix(double **M, int size);
+
+/**
+* Implementation of Strassen Algorithm for Matrices Multiplication. 
+* This algorithm reduces the number of multiplications needed to
+* find the result C = AB, where A, B and C are square matrices of
+* dimension n. Consider that necessarily exists k such that 2^k = n.
+* Then, the algorithm says that
+*
+*	dgemm_strassen(A, B, C, n) = (C_(0,0) = A_(0,0) * B_(0,0)),
+*
+* if n = 1. Otherwise, we must rely on that
+*
+*	C_(1,1) = M1 + M4 - M5 + M7
+* 	C_(1,2) = M3 + M5
+* 	C_(2,1) = M2 + M4
+*	C_(2,2) = M1 - M2 + M3 + M6,
+*
+* where
+*
+*	M1 = (A_(1,1) + A_(2,2))*(B_(1,1) + B_(2,2))
+*	M2 = (A_(2,1) + A_(2,2))*B_(1,1)
+*	M3 = A_(1,1)*(B_(1,2)-B_(2,2))
+*	M4 = A_(2,2)*(B_(2,1)-B_(1,1))
+*	M5 = (A_(1,1) + A_(1,2))*B_(2,2)
+*	M6 = (A_(2,1) - A_(1,1))*(B_(1,1) + B_(1,2))
+*	M7 = (A_(2,1) - A_(1,1))*(B_(2,1) + B_(2,2)),
+*
+* such that every multiplication found in M1, M2, M3, ... are
+* resolved by the general call of dgemm_strassen. Note that
+* the descrpiption D_(1, .) references a submatrix D(1:n/2,.) and
+* that D_(2, .) references a submatrix D(n/2:n,.), where the '.' (dot)
+* is equals to "whatever". Therefore, all multiplications in
+* dgemm_strassen are the result of a divide and conquer based on
+* multiple submatrices of A and B, then partial results of M1, M2, M3, ...
+* are computed in each recursive call, so that C is a combination 
+* of these results. In other words, the general call for dgemm_srassen
+* is
+*
+*	dgemm_strassen(A, B, C, n) = 
+*
+*		C_(1,1) = M1 + M4 - M5 + M7
+* 		C_(1,2) = M3 + M5
+* 		C_(2,1) = M2 + M4
+*		C_(2,2) = M1 - M2 + M3 + M6,
+*
+* 	where each M1, M2, ... are previously resolved in a recursive call of
+*
+*		dgemm_strassen(A_(1,1) + A_(2,2), B_(1,1) + B_(2,2), M1, n/2)...
+*
+* ...and all corresponding expression to M2, M3, ... in order to compute
+* each submatrix of C.
+*/
+void dgemm_strassen(double **A, double **B, double **C, int n) {
+	if(n == 1) {
+		C[0][0] = A[0][0] * B[0][0];
+		return;
+	}
+	int _n = n/2;
+	double **A_11, **A_12, **A_21, **A_22;
+	double **B_11, **B_12, **B_21, **B_22;
+	double **C_11, **C_12, **C_21, **C_22;
+	double **M1, **M2, **M3, **M4, **M5, **M6, **M7;
+	
+	A_11 = createMatrix(_n);
+	A_12 = createMatrix(_n);
+	A_21 = createMatrix(_n);
+	A_22 = createMatrix(_n);
+	
+	B_11 = createMatrix(_n);
+	B_12 = createMatrix(_n);
+	B_21 = createMatrix(_n);
+	B_22 = createMatrix(_n);
+	
+	C_11 = createMatrix(_n);
+	C_12 = createMatrix(_n);
+	C_21 = createMatrix(_n);
+	C_22 = createMatrix(_n);
+	
+	M1 = createMatrix(_n);
+	M2 = createMatrix(_n);
+	M3 = createMatrix(_n);
+	M4 = createMatrix(_n);
+	M5 = createMatrix(_n);
+	M6 = createMatrix(_n);
+	M7 = createMatrix(_n);
+	
+	double **APartialResult = createMatrix(_n);
+	double **BPartialResult = createMatrix(_n);
+	
+	register int i, j;
+	
+	for(i = 0; i < _n; i++) {
+		for(j = 0; j < _n; j++) {
+			A_11[i][j] = A[i][j];
+			A_12[i][j] = A[i][j + _n];
+			A_21[i][j] = A[i + _n][j];
+			A_22[i][j] = A[i + _n][j + _n];
+			
+			B_11[i][j] = B[i][j];
+			B_12[i][j] = B[i][j + _n];
+			B_21[i][j] = B[i + _n][j];
+			B_22[i][j] = B[i + _n][j + _n];
+		}
+	}
+	
+	plus(A_11, A_22, APartialResult, _n);
+	plus(B_11, B_22, BPartialResult, _n);
+	dgemm_strassen(APartialResult, BPartialResult, M1, _n);
+	
+	plus(A_21, A_22, APartialResult, _n);
+	dgemm_strassen(APartialResult, B_11, M2, _n);
+	
+	minus(B_12, B_22, BPartialResult, _n);
+	dgemm_strassen(A_22, BPartialResult, M3, _n);
+	
+	minus(B_21, B_11, BPartialResult, _n);
+	dgemm_strassen(A_22, BPartialResult, M4, _n);
+	
+	plus(A_11, A_12, APartialResult, _n);
+	dgemm_strassen(APartialResult, B_22, M5, _n);
+	
+	minus(A_21, A_11, APartialResult, _n);
+	plus(B_11, B_12, BPartialResult, _n);
+	dgemm_strassen(APartialResult, BPartialResult, M6, _n);
+	
+	minus(A_12, A_22, APartialResult, _n);
+	plus(B_21, B_22, BPartialResult, _n);
+	dgemm_strassen(APartialResult, BPartialResult, M7, _n);
+	
+	plus(M3, M5, C_12, _n);
+	plus(M2, M4, C_21, _n);
+	
+	plus(M1, M4, APartialResult, _n);
+	plus(APartialResult, M7, BPartialResult, _n);
+	minus(BPartialResult, M5, C_11, _n);
+	
+	plus(M1, M3, APartialResult, _n);
+	plus(APartialResult, M6, BPartialResult, _n);
+	minus(BPartialResult, M2, C_22, _n);
+	
+	for(i = 0; i < _n; i++) {
+		for(j = 0; j < _n; j++) {
+			C[i][j] = C_11[i][j];
+			C[i][j + _n] = C_12[i][j];
+			C[i + _n][j] = C_21[i][j];
+			C[i + _n][j + _n] = C_22[i][j];
+		}
+	}
+	
+	A_11 = freeMatrix(A_11, _n);
+	A_12 = freeMatrix(A_12, _n);
+	A_21 = freeMatrix(A_21, _n);
+	A_22 = freeMatrix(A_22, _n);
+	
+	B_11 = freeMatrix(B_11, _n);
+	B_12 = freeMatrix(B_12, _n);
+	B_21 = freeMatrix(B_21, _n);
+	B_22 = freeMatrix(B_22, _n);
+	
+	C_11 = freeMatrix(C_11, _n);
+	C_12 = freeMatrix(C_12, _n);
+	C_21 = freeMatrix(C_21, _n);
+	C_22 = freeMatrix(C_22, _n);
+	
+	M1 = freeMatrix(M1, _n);
+	M2 = freeMatrix(M2, _n);
+	M3 = freeMatrix(M3, _n);
+	M4 = freeMatrix(M4, _n);
+	M5 = freeMatrix(M5, _n);
+	M6 = freeMatrix(M6, _n);
+	M7 = freeMatrix(M7, _n);
+	
+	APartialResult = freeMatrix(APartialResult, _n);
+	BPartialResult = freeMatrix(BPartialResult, _n);
 }
 
-static m *plus(m *restrict mat_A, m *restrict mat_B) {
-    int i, j, A_i, A_j, B_i, B_j;
-
-    int n = mat_A->re - mat_A->rs + 1;
-    m *restrict mat_C = (m *)(malloc(sizeof(m)));
-    mat_C->rs = mat_C->cs = 0;
-    mat_C->re = mat_C->ce = n - 1;
-    mat_C->d = (double *)(malloc(n * n * sizeof(double)));
-
-    double *restrict A = mat_A->d;
-    double *restrict B = mat_B->d;
-    double *restrict C = mat_C->d;
-
-    for (i = 0, A_i = mat_A->rs, B_i = mat_B->rs; A_i <= mat_A->re;
-         A_i++, B_i++, i++) {
-        for (j = 0, A_j = mat_A->cs, B_j = mat_B->cs; A_j <= mat_A->ce;
-             A_j++, B_j++, j++) {
-            C[i * n + j] = A[A_i * n + A_j] + B[B_i * n + B_j];
-        }
-    }
-
-    return mat_C;
+/**
+* Given two real matrices A and B, returns A + B where A, B and 
+* C are size x size.
+*/
+void plus(double **A, double **B, double **A_plus_B, int size) {	
+	register int i, j;
+	for(i = 0; i < size; i++) {
+		for(j = 0; j < size; j++) {
+			A_plus_B[i][j] = A[i][j] + B[i][j];
+		}
+	}
 }
 
-static m *minus(m *restrict mat_A, m *restrict mat_B) {
-    int i, j, A_i, A_j, B_i, B_j;
-
-    int n = mat_A->re - mat_A->rs + 1;
-    m *restrict mat_C = (m *)(malloc(sizeof(m)));
-    mat_C->rs = mat_C->cs = 0;
-    mat_C->re = mat_C->ce = n - 1;
-    mat_C->d = (double *)(malloc(n * n * sizeof(double)));
-
-    double *restrict A = mat_A->d;
-    double *restrict B = mat_B->d;
-    double *restrict C = mat_C->d;
-
-    for (i = 0, A_i = mat_A->rs, B_i = mat_B->rs; A_i <= mat_A->re;
-         A_i++, B_i++, i++) {
-        for (j = 0, A_j = mat_A->cs, B_j = mat_B->cs; A_j <= mat_A->ce;
-             A_j++, B_j++, j++) {
-            C[i * n + j] = A[A_i * n + A_j] - B[B_i * n + B_j];
-        }
-    }
-
-    return mat_C;
+/**
+* Given two real matrices A and B, returns A - B where A, B and
+* C are size x size.
+*/
+void minus(double **A, double **B, double **A_minus_B, int size) {
+	register int i, j;
+	for(i = 0; i < size; i++) {
+		for(j = 0; j < size; j++) {
+			A_minus_B[i][j] = A[i][j] - B[i][j];	
+		}
+	}
 }
 
-static m *multiply(m *restrict mat_A, m *restrict mat_B) {
-    int n = mat_A->re - mat_A->rs + 1;
-    m *mat_C = (m *)(malloc(sizeof(m)));
-    mat_C->rs = mat_C->cs = 0;
-    mat_C->re = mat_C->ce = n - 1;
-    mat_C->d = (double *)(malloc(n * n * sizeof(double)));
-    double *restrict m_A = mat_A->d;
-    double *restrict m_B = mat_B->d;
-    double *restrict m_C = mat_C->d;
+/**
+* Creates a real matrix size x size. If there's not enough memory to be
+* allocated, the program should be terminated. Otherwise, returns a
+* pointer to the created matrix's memory address.
+*/
+double **createMatrix(int size) {
+	double **M = (double **) malloc(sizeof(double *) * size);
+	if(M == NULL) {
+		exit(1);
+	}
+	register int i;
+	for(i = 0; i < size; i++) {
+		M[i] = (double *) malloc(sizeof(double) * size);
+		if(M[i] == NULL) {
+			exit(1);
+		}
+		memset(M[i], 0.0, sizeof(double) * size);
+	}
+	return M;
+}
 
-    if (n <= 2) {
-        double a, b, c, d, e, f, g, h;
-
-        a = m_A[mat_A->rs * n + mat_A->cs];
-        b = m_A[mat_A->rs * n + mat_A->ce];
-        c = m_A[mat_A->re * n + mat_A->cs];
-        d = m_A[mat_A->re * n + mat_A->ce];
-        e = m_B[mat_B->rs * n + mat_B->cs];
-        f = m_B[mat_B->rs * n + mat_B->ce];
-        g = m_B[mat_B->re * n + mat_B->cs];
-        h = m_B[mat_B->re * n + mat_B->ce];
-
-        m_C[mat_C->rs * n + mat_C->cs] = a * e + b * g;
-        m_C[mat_C->rs * n + mat_C->ce] = a * f + b * h;
-        m_C[mat_C->re * n + mat_C->cs] = c * e + d * g;
-        m_C[mat_C->re * n + mat_C->ce] = c * f + d * h;
-    } else {
-        m *restrict A, *restrict B, *restrict C, *restrict D, *restrict E,
-            *restrict F, *restrict G, *restrict H, *restrict temp_I,
-            *restrict temp_J, *restrict temp_K, *restrict temp_L,
-            *restrict temp_M, *restrict temp_N, *restrict temp_O,
-            *restrict temp_P, *restrict temp_Q, *restrict temp_R;
-        m *restrict P1, *restrict P2, *restrict P3, *restrict P4, *restrict P5,
-            *restrict P6, *restrict P7, *restrict temp_P8, *restrict temp_P9,
-            *restrict temp_P10, *restrict temp_P11;
-        m *restrict Q1, *restrict Q2, *restrict Q3, *restrict Q4;
-        m *restrict res;
-        int Q_i, Q_j;
-        int i, j;
-
-        A = (m *)(malloc(sizeof(m)));
-        B = (m *)(malloc(sizeof(m)));
-        C = (m *)(malloc(sizeof(m)));
-        D = (m *)(malloc(sizeof(m)));
-        E = (m *)(malloc(sizeof(m)));
-        F = (m *)(malloc(sizeof(m)));
-        G = (m *)(malloc(sizeof(m)));
-        H = (m *)(malloc(sizeof(m)));
-
-        A->d = B->d = C->d = D->d = m_A;
-        E->d = F->d = G->d = H->d = m_B;
-
-        A->rs = mat_A->rs;
-        A->re = (mat_A->re - mat_A->rs) / 2 + mat_A->rs;
-        A->cs = mat_A->cs;
-        A->ce = (mat_A->ce - mat_A->cs) / 2 + mat_A->cs;
-
-        B->rs = mat_A->rs;
-        B->re = (mat_A->re - mat_A->rs) / 2 + mat_A->rs;
-        B->cs = (mat_A->ce - mat_A->cs) / 2 + mat_A->cs + 1;
-        B->ce = mat_A->ce;
-
-        C->rs = (mat_A->re - mat_A->rs) / 2 + mat_A->rs + 1;
-        C->re = mat_A->re;
-        C->cs = mat_A->cs;
-        C->ce = (mat_A->ce - mat_A->cs) / 2 + mat_A->cs;
-
-        D->rs = (mat_A->re - mat_A->rs) / 2 + mat_A->rs + 1;
-        D->re = mat_A->re;
-        D->cs = (mat_A->ce - mat_A->cs) / 2 + mat_A->cs + 1;
-        D->ce = mat_A->ce;
-
-        E->rs = mat_B->rs;
-        E->re = (mat_B->re - mat_B->rs) / 2 + mat_B->rs;
-        E->cs = mat_B->cs;
-        E->ce = (mat_B->ce - mat_B->cs) / 2 + mat_B->cs;
-
-        F->rs = mat_B->rs;
-        F->re = (mat_B->re - mat_B->rs) / 2 + mat_B->rs;
-        F->cs = (mat_B->ce - mat_B->cs) / 2 + mat_B->cs + 1;
-        F->ce = mat_B->ce;
-
-        G->rs = (mat_B->re - mat_B->rs) / 2 + mat_B->rs + 1;
-        G->re = mat_B->re;
-        G->cs = mat_B->cs;
-        G->ce = (mat_B->ce - mat_B->cs) / 2 + mat_B->cs;
-
-        H->rs = (mat_B->re - mat_B->rs) / 2 + mat_B->rs + 1;
-        H->re = mat_B->re;
-        H->cs = (mat_B->ce - mat_B->cs) / 2 + mat_B->cs + 1;
-        H->ce = mat_B->ce;
-
-        P1 = multiply(A, temp_I = minus(F, H));
-        P2 = multiply(temp_J = plus(A, B), H);
-        P3 = multiply(temp_K = plus(C, D), E);
-        P4 = multiply(D, temp_L = minus(G, E));
-        P5 = multiply(temp_M = plus(A, D), temp_N = plus(E, H));
-        P6 = multiply(temp_O = minus(B, D), temp_P = plus(G, H));
-        P7 = multiply(temp_Q = minus(A, C), temp_R = plus(E, F));
-
-        free(A);
-        free(B);
-        free(C);
-        free(D);
-        free(E);
-        free(F);
-        free(G);
-        free(H);
-        free(temp_I->d);
-        free(temp_J->d);
-        free(temp_K->d);
-        free(temp_L->d);
-        free(temp_M->d);
-        free(temp_N->d);
-        free(temp_O->d);
-        free(temp_P->d);
-        free(temp_Q->d);
-        free(temp_R->d);
-        free(temp_I);
-        free(temp_J);
-        free(temp_K);
-        free(temp_L);
-        free(temp_M);
-        free(temp_N);
-        free(temp_O);
-        free(temp_P);
-        free(temp_Q);
-        free(temp_R);
-
-        Q1 = plus(temp_P9 = minus(temp_P8 = plus(P5, P4), P2), P6);
-        Q2 = plus(P1, P2);
-        Q3 = plus(P3, P4);
-        Q4 = minus(temp_P11 = minus(temp_P10 = plus(P1, P5), P3), P7);
-
-        free(P1->d);
-        free(P2->d);
-        free(P3->d);
-        free(P4->d);
-        free(P5->d);
-        free(P6->d);
-        free(P7->d);
-        free(P1);
-        free(P2);
-        free(P3);
-        free(P4);
-        free(P5);
-        free(P6);
-        free(P7);
-        free(temp_P8->d);
-        free(temp_P9->d);
-        free(temp_P10->d);
-        free(temp_P11->d);
-        free(temp_P8);
-        free(temp_P9);
-        free(temp_P10);
-        free(temp_P11);
-
-        int size = Q1->re - Q1->rs + 1;
-
-        for (Q_i = Q1->rs, i = 0; Q_i <= Q1->re; Q_i++, i++) {
-            for (Q_j = Q1->cs, j = 0; Q_j <= Q1->ce; Q_j++, j++) {
-                m_C[i * n + j] = Q1->d[Q_i * size + Q_j];
-            }
-        }
-
-        for (Q_i = Q2->rs, i = 0; Q_i <= Q2->re; Q_i++, i++) {
-            for (Q_j = Q2->cs, j = n / 2; Q_j <= Q2->ce; Q_j++, j++) {
-                m_C[i * n + j] = Q2->d[Q_i * size + Q_j];
-            }
-        }
-
-        for (Q_i = Q3->rs, i = n / 2; Q_i <= Q3->re; Q_i++, i++) {
-            for (Q_j = Q3->cs, j = 0; Q_j <= Q3->ce; Q_j++, j++) {
-                m_C[i * n + j] = Q3->d[Q_i * size + Q_j];
-            }
-        }
-
-        for (Q_i = Q4->rs, i = n / 2; Q_i <= Q4->re; Q_i++, i++) {
-            for (Q_j = Q4->cs, j = n / 2; Q_j <= Q4->ce; Q_j++, j++) {
-                m_C[i * n + j] = Q4->d[Q_i * size + Q_j];
-            }
-        }
-
-        free(Q1->d);
-        free(Q2->d);
-        free(Q3->d);
-        free(Q4->d);
-        free(Q1);
-        free(Q2);
-        free(Q3);
-        free(Q4);
-    }
-    return mat_C;
+/**
+* Frees the allocated space for a real matrix addressed by the
+* pointer M, whose size must be size x size. Returns NULL in
+* case of success.
+*/
+double **freeMatrix(double **M, int size) {
+	register int i;
+	if(M == NULL)
+		return NULL;
+	for(i = 0; i < size; i++) {
+		if(M[i]) {
+			free(M[i]);
+			M[i] = NULL;
+		}
+	}
+	free(M);
+	M = NULL;
+	return NULL;
 }
 
 /* This routine performs a dgemm operation
  *  C := C + A * B
  * where A, B, and C are lda-by-lda matrices stored in column-major format.
  * On exit, A and B maintain their input values. */
-void square_dgemm(int n, double *restrict A, double *restrict B,
-                  double *restrict C) {
-    int lda = next_power_of_two(n);
-    double *restrict d_A = (double *)(malloc(lda * lda * sizeof(double)));
-    double *restrict d_B = (double *)(malloc(lda * lda * sizeof(double)));
-    for (int i = 0; i < lda; i++) {
-        for (int j = 0; j < lda; j++) {
-            int pos_lda = i * lda + j;
-            if (i < n && j < n) {
-                int pos_n = i * n + j;
-                d_A[pos_lda] = A[pos_n];
-                d_B[pos_lda] = B[pos_n];
-            } else {
-                d_A[pos_lda] = 0.0;
-                d_B[pos_lda] = 0.0;
-            }
-        }
-    }
-    m mat_A = {0, lda - 1, 0, lda - 1, d_A};
-    m mat_B = {0, lda - 1, 0, lda - 1, d_B};
-    m *mat_C = multiply(&mat_A, &mat_B);
-
-    free(mat_A.d);
-    free(mat_B.d);
-
-    double *restrict d_C = mat_C->d;
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            int pos_n = i * n + j;
-            int pos_lda = i * lda + j;
-            C[pos_n] = d_C[pos_lda];
-        }
-    }
-
-    free(mat_C->d);
-    free(mat_C);
+void square_dgemm(int n, double *restrict A, double *restrict B, double *restrict C) {
+	int correctSize;
+	int log2n = log2(n);
+	if((1 << log2n) != n) {
+		
+	}
 }
