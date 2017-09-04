@@ -33,7 +33,7 @@ static m *plus(m *restrict mat_A, m *restrict mat_B) {
          A_i++, B_i++, i++) {
         for (j = 0, A_j = mat_A->cs, B_j = mat_B->cs; A_j <= mat_A->ce;
              A_j++, B_j++, j++) {
-            C[i * n + j] = A[A_i * n + A_j] + B[B_i * n + B_j];
+            C[j * n + i] = A[A_j * n + A_i] + B[B_j * n + B_i];
         }
     }
 
@@ -57,7 +57,7 @@ static m *minus(m *restrict mat_A, m *restrict mat_B) {
          A_i++, B_i++, i++) {
         for (j = 0, A_j = mat_A->cs, B_j = mat_B->cs; A_j <= mat_A->ce;
              A_j++, B_j++, j++) {
-            C[i * n + j] = A[A_i * n + A_j] - B[B_i * n + B_j];
+            C[j * n + i] = A[A_j * n + A_i] - B[B_j * n + B_i];
         }
     }
 
@@ -100,7 +100,7 @@ static m *multiply(m *restrict mat_A, m *restrict mat_B) {
             *restrict P6, *restrict P7, *restrict temp_P8, *restrict temp_P9,
             *restrict temp_P10, *restrict temp_P11;
         m *restrict Q1, *restrict Q2, *restrict Q3, *restrict Q4;
-        m *restrict res;
+
         int Q_i, Q_j;
         int i, j;
 
@@ -225,25 +225,25 @@ static m *multiply(m *restrict mat_A, m *restrict mat_B) {
 
         for (Q_i = Q1->rs, i = 0; Q_i <= Q1->re; Q_i++, i++) {
             for (Q_j = Q1->cs, j = 0; Q_j <= Q1->ce; Q_j++, j++) {
-                m_C[i * n + j] = Q1->d[Q_i * size + Q_j];
+                m_C[j * n + i] = Q1->d[Q_j * size + Q_i];
             }
         }
 
         for (Q_i = Q2->rs, i = 0; Q_i <= Q2->re; Q_i++, i++) {
             for (Q_j = Q2->cs, j = n / 2; Q_j <= Q2->ce; Q_j++, j++) {
-                m_C[i * n + j] = Q2->d[Q_i * size + Q_j];
+                m_C[j * n + i] = Q2->d[Q_j * size + Q_i];
             }
         }
 
         for (Q_i = Q3->rs, i = n / 2; Q_i <= Q3->re; Q_i++, i++) {
             for (Q_j = Q3->cs, j = 0; Q_j <= Q3->ce; Q_j++, j++) {
-                m_C[i * n + j] = Q3->d[Q_i * size + Q_j];
+                m_C[j * n + i] = Q3->d[Q_j * size + Q_i];
             }
         }
 
         for (Q_i = Q4->rs, i = n / 2; Q_i <= Q4->re; Q_i++, i++) {
             for (Q_j = Q4->cs, j = n / 2; Q_j <= Q4->ce; Q_j++, j++) {
-                m_C[i * n + j] = Q4->d[Q_i * size + Q_j];
+                m_C[j * n + i] = Q4->d[Q_j * size + Q_i];
             }
         }
 
@@ -270,9 +270,9 @@ void square_dgemm(int n, double *restrict A, double *restrict B,
     double *restrict d_B = (double *)(malloc(lda * lda * sizeof(double)));
     for (int i = 0; i < lda; i++) {
         for (int j = 0; j < lda; j++) {
-            int pos_lda = i * lda + j;
+            int pos_lda = j * lda + i;
             if (i < n && j < n) {
-                int pos_n = i * n + j;
+                int pos_n = j * n + i;
                 d_A[pos_lda] = A[pos_n];
                 d_B[pos_lda] = B[pos_n];
             } else {
@@ -291,8 +291,8 @@ void square_dgemm(int n, double *restrict A, double *restrict B,
     double *restrict d_C = mat_C->d;
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            int pos_n = i * n + j;
-            int pos_lda = i * lda + j;
+            int pos_n = j * n + i;
+            int pos_lda = j * lda + i;
             C[pos_n] = d_C[pos_lda];
         }
     }
