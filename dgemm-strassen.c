@@ -3,24 +3,21 @@
 #include <stdio.h>
 #include <string.h>
 
-#if !defined(BLOCK_SIZE)
-#define BLOCK_SIZE 41
-#endif
+#define SubM_11_cm(i, j, _n, n) (j * n + i)
+#define SubM_12_cm(i, j, _n, n) ((j + _n) * n + i)
+#define SubM_21_cm(i, j, _n, n) (j * n + (i + _n))
+#define SubM_22_cm(i, j, _n, n) ((j + _n) * n + (i + _n))
 
 const char *dgemm_desc = "Strassen divide and conquer dgemm.";
 
 /**
 * Function signatures.
 */
-static void dgemm_strassen(double **A, double **B, double **C, int n);
+static void dgemm_strassen(double *restrict A, double *restrict B, double *restrict C, int n);
 
-static void plus(double **A, double **B, double **A_plus_B, int size);
+static double *restrict createMatrixColumnMajor(int size);
 
-static void minus(double **A, double **B, double **A_minus_B, int size);
-
-static double **createMatrix(int size);
-
-static double **freeMatrix(double **M, int size);
+static double *restrict freeMatrixColumnMajor(double *restrict M, int size);
 
 /**
 * Returns the first value 2^k >= n.
@@ -80,193 +77,116 @@ static int next_power_of_two(int n) {
 * ...and all corresponding expression to M2, M3, ... in order to compute
 * each submatrix of C.
 */
-static void dgemm_strassen(double **A, double **B, double **C, int n) {
+static void dgemm_strassen(double *restrict A, double *restrict B, double *restrict C, int n) {
 	if(n == 1) {
-		C[0][0] = A[0][0] * B[0][0];
+		C[0] = A[0] * B[0];
 		return;
 	}
 	int _n = n/2;
-	double **A_11, **A_12, **A_21, **A_22;
-	double **B_11, **B_12, **B_21, **B_22;
-	double **C_11, **C_12, **C_21, **C_22;
-	double **M1, **M2, **M3, **M4, **M5, **M6, **M7;
+	double *restrict M1, *restrict M2, *restrict M3, *restrict M4, *restrict M5, *restrict M6, *restrict M7;
 	
-	A_11 = createMatrix(_n);
-	A_12 = createMatrix(_n);
-	A_21 = createMatrix(_n);
-	A_22 = createMatrix(_n);
+	double *restrict A_11 = createMatrixColumnMajor(_n);
+	double *restrict A_22 = createMatrixColumnMajor(_n);
+	double *restrict B_11 = createMatrixColumnMajor(_n);
+	double *restrict B_22 = createMatrixColumnMajor(_n);
+	double *restrict T0 = createMatrixColumnMajor(_n);
+	double *restrict T1 = createMatrixColumnMajor(_n);
+	double *restrict T2 = createMatrixColumnMajor(_n);
+	double *restrict T3 = createMatrixColumnMajor(_n);
+	double *restrict T4 = createMatrixColumnMajor(_n);
+	double *restrict T5 = createMatrixColumnMajor(_n);
+	double *restrict T6 = createMatrixColumnMajor(_n);
+	double *restrict T7 = createMatrixColumnMajor(_n);
+	double *restrict T8 = createMatrixColumnMajor(_n);
+	double *restrict T9 = createMatrixColumnMajor(_n);
+
 	
-	B_11 = createMatrix(_n);
-	B_12 = createMatrix(_n);
-	B_21 = createMatrix(_n);
-	B_22 = createMatrix(_n);
-	
-	C_11 = createMatrix(_n);
-	C_12 = createMatrix(_n);
-	C_21 = createMatrix(_n);
-	C_22 = createMatrix(_n);
-	
-	M1 = createMatrix(_n);
-	M2 = createMatrix(_n);
-	M3 = createMatrix(_n);
-	M4 = createMatrix(_n);
-	M5 = createMatrix(_n);
-	M6 = createMatrix(_n);
-	M7 = createMatrix(_n);
-	
-	double **APartialResult = createMatrix(_n);
-	double **BPartialResult = createMatrix(_n);
+	M1 = createMatrixColumnMajor(_n);
+	M2 = createMatrixColumnMajor(_n);
+	M3 = createMatrixColumnMajor(_n);
+	M4 = createMatrixColumnMajor(_n);
+	M5 = createMatrixColumnMajor(_n);
+	M6 = createMatrixColumnMajor(_n);
+	M7 = createMatrixColumnMajor(_n);
 	
 	register int i, j;
-	
-	for(i = 0; i < _n; i++) {
-		for(j = 0; j < _n; j++) {
-			A_11[i][j] = A[i][j];
-			A_12[i][j] = A[i][j + _n];
-			A_21[i][j] = A[i + _n][j];
-			A_22[i][j] = A[i + _n][j + _n];
-			
-			B_11[i][j] = B[i][j];
-			B_12[i][j] = B[i][j + _n];
-			B_21[i][j] = B[i + _n][j];
-			B_22[i][j] = B[i + _n][j + _n];
+	for(j = 0; j < _n; j++) {
+		for(i = 0; i < _n; i++) {
+			A_11[j * _n + i] = A[SubM_11_cm(i, j, _n, n)];
+			A_22[j * _n + i] = A[SubM_22_cm(i, j, _n, n)];
+			B_11[j * _n + i] = B[SubM_11_cm(i, j, _n, n)];
+			B_22[j * _n + i] = B[SubM_22_cm(i, j, _n, n)];
+			T1[j * _n + i] = A[SubM_11_cm(i, j, _n, n)] + A[SubM_22_cm(i, j, _n, n)];
+			T2[j * _n + i] = B[SubM_11_cm(i, j, _n, n)] + B[SubM_22_cm(i, j, _n, n)];
+			T3[j * _n + i] = A[SubM_21_cm(i, j, _n, n)] + A[SubM_22_cm(i, j, _n, n)];
+			T4[j * _n + i] = B[SubM_12_cm(i, j, _n, n)] - B[SubM_22_cm(i, j, _n, n)];
+			T5[j * _n + i] = B[SubM_21_cm(i, j, _n, n)] - B[SubM_11_cm(i, j, _n, n)];
+			T6[j * _n + i] = A[SubM_11_cm(i, j, _n, n)] + A[SubM_12_cm(i, j, _n, n)];
+			T7[j * _n + i] = A[SubM_21_cm(i, j, _n, n)] - A[SubM_11_cm(i, j, _n, n)];
+			T8[j * _n + i] = B[SubM_11_cm(i, j, _n, n)] + B[SubM_12_cm(i, j, _n, n)];
+			T9[j * _n + i] = A[SubM_12_cm(i, j, _n, n)] - A[SubM_22_cm(i, j, _n, n)];
+			T0[j * _n + i] = B[SubM_21_cm(i, j, _n, n)] + B[SubM_22_cm(i, j, _n, n)];
 		}
 	}
 	
-	plus(A_11, A_22, APartialResult, _n);
-	plus(B_11, B_22, BPartialResult, _n);
-	dgemm_strassen(APartialResult, BPartialResult, M1, _n);
+	dgemm_strassen(T1, T2, M1, _n);
+	dgemm_strassen(T3, B_11, M2, _n);	
+	dgemm_strassen(A_11, T4, M3, _n);
+	dgemm_strassen(A_22, T5, M4, _n);
+	dgemm_strassen(T6, B_22, M5, _n);
+	dgemm_strassen(T7, T8 , M6, _n);
+	dgemm_strassen(T9, T0, M7, _n);
 	
-	plus(A_21, A_22, APartialResult, _n);
-	dgemm_strassen(APartialResult, B_11, M2, _n);
-	
-	minus(B_12, B_22, BPartialResult, _n);
-	dgemm_strassen(A_11, BPartialResult, M3, _n);
-	
-	minus(B_21, B_11, BPartialResult, _n);
-	dgemm_strassen(A_22, BPartialResult, M4, _n);
-	
-	plus(A_11, A_12, APartialResult, _n);
-	dgemm_strassen(APartialResult, B_22, M5, _n);
-	
-	minus(A_21, A_11, APartialResult, _n);
-	plus(B_11, B_12, BPartialResult, _n);
-	dgemm_strassen(APartialResult, BPartialResult, M6, _n);
-	
-	minus(A_12, A_22, APartialResult, _n);
-	plus(B_21, B_22, BPartialResult, _n);
-	dgemm_strassen(APartialResult, BPartialResult, M7, _n);
-	
-	plus(M3, M5, C_12, _n);
-	plus(M2, M4, C_21, _n);
-	
-	plus(M1, M4, APartialResult, _n);
-	plus(APartialResult, M7, BPartialResult, _n);
-	minus(BPartialResult, M5, C_11, _n);
-	
-	plus(M1, M3, APartialResult, _n);
-	plus(APartialResult, M6, BPartialResult, _n);
-	minus(BPartialResult, M2, C_22, _n);
-	
-	for(i = 0; i < _n; i++) {
-		for(j = 0; j < _n; j++) {
-			C[i][j] = C_11[i][j];
-			C[i][j + _n] = C_12[i][j];
-			C[i + _n][j] = C_21[i][j];
-			C[i + _n][j + _n] = C_22[i][j];
+	for(j = 0; j < _n; j++) {
+		for(i = 0; i < _n; i++) {
+			C[SubM_11_cm(i, j, _n, n)] = M1[j * _n + i] + M4[j * _n + i] - M5[j * _n + i] + M7[j * _n + i];
+			C[SubM_12_cm(i, j, _n, n)] = M3[j * _n + i] + M5[j * _n + i];
+			C[SubM_21_cm(i, j, _n, n)] = M2[j * _n + i] + M4[j * _n + i];
+			C[SubM_22_cm(i, j, _n, n)] = M1[j * _n + i] - M2[j * _n + i] + M3[j * _n + i] + M6[j * _n + i];
 		}
 	}
-	
-	A_11 = freeMatrix(A_11, _n);
-	A_12 = freeMatrix(A_12, _n);
-	A_21 = freeMatrix(A_21, _n);
-	A_22 = freeMatrix(A_22, _n);
-	
-	B_11 = freeMatrix(B_11, _n);
-	B_12 = freeMatrix(B_12, _n);
-	B_21 = freeMatrix(B_21, _n);
-	B_22 = freeMatrix(B_22, _n);
-	
-	C_11 = freeMatrix(C_11, _n);
-	C_12 = freeMatrix(C_12, _n);
-	C_21 = freeMatrix(C_21, _n);
-	C_22 = freeMatrix(C_22, _n);
-	
-	M1 = freeMatrix(M1, _n);
-	M2 = freeMatrix(M2, _n);
-	M3 = freeMatrix(M3, _n);
-	M4 = freeMatrix(M4, _n);
-	M5 = freeMatrix(M5, _n);
-	M6 = freeMatrix(M6, _n);
-	M7 = freeMatrix(M7, _n);
-	
-	APartialResult = freeMatrix(APartialResult, _n);
-	BPartialResult = freeMatrix(BPartialResult, _n);
+
+	A_11 = freeMatrixColumnMajor(A_11, _n);
+	A_22 = freeMatrixColumnMajor(A_22, _n);
+	B_11 = freeMatrixColumnMajor(B_11, _n);
+	B_22 = freeMatrixColumnMajor(B_22, _n);
+	M1 = freeMatrixColumnMajor(M1, _n);
+	M2 = freeMatrixColumnMajor(M2, _n);
+	M3 = freeMatrixColumnMajor(M3, _n);
+	M4 = freeMatrixColumnMajor(M4, _n);
+	M5 = freeMatrixColumnMajor(M5, _n);
+	M6 = freeMatrixColumnMajor(M6, _n);
+	M7 = freeMatrixColumnMajor(M7, _n);
+	T0 = freeMatrixColumnMajor(T0, _n);
+	T1 = freeMatrixColumnMajor(T1, _n);
+	T2 = freeMatrixColumnMajor(T2, _n);
+	T3 = freeMatrixColumnMajor(T3, _n);
+	T4 = freeMatrixColumnMajor(T4, _n);
+	T5 = freeMatrixColumnMajor(T5, _n);
+	T6 = freeMatrixColumnMajor(T6, _n);
+	T7 = freeMatrixColumnMajor(T7, _n);
+	T8 = freeMatrixColumnMajor(T8, _n);
+	T9 = freeMatrixColumnMajor(T9, _n);
 }
 
 /**
-* Given two real matrices A and B, returns A + B where A, B and 
-* C are size x size.
+* Creates a real matrix size * size in column-major format.
 */
-static void plus(double **A, double **B, double **A_plus_B, int size) {	
-	register int i, j;
-	for(i = 0; i < size; i++) {
-		for(j = 0; j < size; j++) {
-			A_plus_B[i][j] = A[i][j] + B[i][j];
-		}
-	}
-}
-
-/**
-* Given two real matrices A and B, returns A - B where A, B and
-* C are size x size.
-*/
-static void minus(double **A, double **B, double **A_minus_B, int size) {
-	register int i, j;
-	for(i = 0; i < size; i++) {
-		for(j = 0; j < size; j++) {
-			A_minus_B[i][j] = A[i][j] - B[i][j];	
-		}
-	}
-}
-
-/**
-* Creates a real matrix size x size. If there's not enough memory to be
-* allocated, the program should be terminated. Otherwise, returns a
-* pointer to the created matrix's memory address.
-*/
-static double **createMatrix(int size) {
-	double **M = (double **) malloc(sizeof(double *) * size);
+static double *restrict createMatrixColumnMajor(int size) {
+	double *restrict M = (double *) malloc(sizeof(double) * size * size);
 	if(M == NULL) {
 		exit(1);
 	}
-	register int i;
-	for(i = 0; i < size; i++) {
-		M[i] = (double *) malloc(sizeof(double) * size);
-		if(M[i] == NULL) {
-			printf("error\n");
-			exit(1);
-		}
-		memset(M[i], 0.0, sizeof(double) * size);
-	}
+	memset(M, 0.0, sizeof(double) * size * size);
 	return M;
 }
 
 /**
-* Frees the allocated space for a real matrix addressed by the
-* pointer M, whose size must be size x size. Returns NULL in
-* case of success.
+* Frees the allocated space for a real matrix in column-major format.
 */
-static double **freeMatrix(double **M, int size) {
-	register int i;
+static double *restrict freeMatrixColumnMajor(double *restrict M, int size) {
 	if(M == NULL)
 		return NULL;
-	for(i = 0; i < size; i++) {
-		if(M[i]) {
-			free(M[i]);
-			M[i] = NULL;
-		}
-	}
 	free(M);
 	M = NULL;
 	return NULL;
@@ -278,22 +198,31 @@ static double **freeMatrix(double **M, int size) {
  * On exit, A and B maintain their input values. */
 void square_dgemm(int n, double *restrict A, double *restrict B, double *restrict C) {
 	int correctSize = next_power_of_two(n);
-	double **Asized2;
-	double **Bsized2;
-	Asized2 = createMatrix(correctSize);
-	Bsized2 = createMatrix(correctSize);
+	double *restrict Asized2 = createMatrixColumnMajor(correctSize);
+	double *restrict Bsized2 = createMatrixColumnMajor(correctSize);
 	register int i, j;
-	for(i = 0; i < n; i++) {
-		for(j = 0; j < n; j++) {
-			Asized2[i][j] = A[j * n + i];
-			Bsized2[i][j] = B[j * n + i];
+	for(j = 0; j <  correctSize; j++) {
+		for(i = 0; i < correctSize; i++) {
+			if(j >= n || i >= n) {
+				Asized2[j * correctSize + i] = 0.0;
+				Bsized2[j * correctSize + i] = 0.0;			
+			}
+			else {
+				Asized2[j * correctSize + i] = A[j * n + i];
+				Bsized2[j * correctSize + i] = B[j * n + i];
+			}
 		}
 	}
-	double **Csized2 = createMatrix(correctSize);
+	double *restrict Csized2 = createMatrixColumnMajor(correctSize);
 	dgemm_strassen(Asized2, Bsized2, Csized2, correctSize);
-	for(i = 0; i < n; i++) {
-		for(j = 0; j < n; j++) {
-			C[j * n + i] = Csized2[i][j];
+	for(j = 0; j < correctSize; j++) {
+		for(i = 0; i < correctSize; i++) {
+			if(i < n && j < n) {
+				C[j * n + i] = Csized2[j * correctSize + i];				
+			}
 		}
 	}
+	freeMatrixColumnMajor(Asized2, correctSize);
+	freeMatrixColumnMajor(Bsized2, correctSize);
+	freeMatrixColumnMajor(Csized2, correctSize);
 }
