@@ -3,9 +3,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#if !defined(BLOCK_SIZE)
-#define BLOCK_SIZE 41
-#endif
+#define SubM_11_cm(i, j, _n, n) (j * n + i)
+#define SubM_12_cm(i, j, _n, n) ((j + _n) * n + i)
+#define SubM_21_cm(i, j, _n, n) (j * n + (i + _n))
+#define SubM_22_cm(i, j, _n, n) ((j + _n) * n + (i + _n))
 
 const char *dgemm_desc = "Strassen divide and conquer dgemm.";
 
@@ -13,10 +14,6 @@ const char *dgemm_desc = "Strassen divide and conquer dgemm.";
 * Function signatures.
 */
 static void dgemm_strassen(double *restrict A, double *restrict B, double *restrict C, int n);
-
-static void plus(double *restrict A, double *restrict B, double *restrict A_plus_B, int size);
-
-static void minus(double *restrict A, double *restrict B, double *restrict A_minus_B, int size);
 
 static double *restrict createMatrixColumnMajor(int size);
 
@@ -86,25 +83,23 @@ static void dgemm_strassen(double *restrict A, double *restrict B, double *restr
 		return;
 	}
 	int _n = n/2;
-	double *restrict A_11, *restrict A_12, *restrict A_21, *restrict A_22;
-	double *restrict B_11, *restrict B_12, *restrict B_21, *restrict B_22;
-	double *restrict C_11, *restrict C_12, *restrict C_21, *restrict C_22;
 	double *restrict M1, *restrict M2, *restrict M3, *restrict M4, *restrict M5, *restrict M6, *restrict M7;
 	
-	A_11 = createMatrixColumnMajor(_n);
-	A_12 = createMatrixColumnMajor(_n);
-	A_21 = createMatrixColumnMajor(_n);
-	A_22 = createMatrixColumnMajor(_n);
-	
-	B_11 = createMatrixColumnMajor(_n);
-	B_12 = createMatrixColumnMajor(_n);
-	B_21 = createMatrixColumnMajor(_n);
-	B_22 = createMatrixColumnMajor(_n);
-	
-	C_11 = createMatrixColumnMajor(_n);
-	C_12 = createMatrixColumnMajor(_n);
-	C_21 = createMatrixColumnMajor(_n);
-	C_22 = createMatrixColumnMajor(_n);
+	double *restrict A_11 = createMatrixColumnMajor(_n);
+	double *restrict A_22 = createMatrixColumnMajor(_n);
+	double *restrict B_11 = createMatrixColumnMajor(_n);
+	double *restrict B_22 = createMatrixColumnMajor(_n);
+	double *restrict T0 = createMatrixColumnMajor(_n);
+	double *restrict T1 = createMatrixColumnMajor(_n);
+	double *restrict T2 = createMatrixColumnMajor(_n);
+	double *restrict T3 = createMatrixColumnMajor(_n);
+	double *restrict T4 = createMatrixColumnMajor(_n);
+	double *restrict T5 = createMatrixColumnMajor(_n);
+	double *restrict T6 = createMatrixColumnMajor(_n);
+	double *restrict T7 = createMatrixColumnMajor(_n);
+	double *restrict T8 = createMatrixColumnMajor(_n);
+	double *restrict T9 = createMatrixColumnMajor(_n);
+
 	
 	M1 = createMatrixColumnMajor(_n);
 	M2 = createMatrixColumnMajor(_n);
@@ -114,84 +109,47 @@ static void dgemm_strassen(double *restrict A, double *restrict B, double *restr
 	M6 = createMatrixColumnMajor(_n);
 	M7 = createMatrixColumnMajor(_n);
 	
-	double *restrict APartialResult = createMatrixColumnMajor(_n);
-	double *restrict BPartialResult = createMatrixColumnMajor(_n);
-	
 	register int i, j;
-	
-	for(i = 0; i < _n; i++) {
-		for(j = 0; j < _n; j++) {
-			A_11[j * _n + i] = A[j * n + i];
-			A_12[j * _n + i] = A[(j + _n) * n + i];
-			A_21[j * _n + i] = A[j * n + (i + _n)];
-			A_22[j * _n + i] = A[(j + _n) * n + (i + _n)];
-			
-			B_11[j * _n + i] = B[j * n + i];
-			B_12[j * _n + i] = B[(j + _n) * n + i];
-			B_21[j * _n + i] = B[j * n + (i + _n)];
-			B_22[j * _n + i] = B[(j + _n) * n + (i + _n)];
+	for(j = 0; j < _n; j++) {
+		for(i = 0; i < _n; i++) {
+			A_11[j * _n + i] = A[SubM_11_cm(i, j, _n, n)];
+			A_22[j * _n + i] = A[SubM_22_cm(i, j, _n, n)];
+			B_11[j * _n + i] = B[SubM_11_cm(i, j, _n, n)];
+			B_22[j * _n + i] = B[SubM_22_cm(i, j, _n, n)];
+			T1[j * _n + i] = A[SubM_11_cm(i, j, _n, n)] + A[SubM_22_cm(i, j, _n, n)];
+			T2[j * _n + i] = B[SubM_11_cm(i, j, _n, n)] + B[SubM_22_cm(i, j, _n, n)];
+			T3[j * _n + i] = A[SubM_21_cm(i, j, _n, n)] + A[SubM_22_cm(i, j, _n, n)];
+			T4[j * _n + i] = B[SubM_12_cm(i, j, _n, n)] - B[SubM_22_cm(i, j, _n, n)];
+			T5[j * _n + i] = B[SubM_21_cm(i, j, _n, n)] - B[SubM_11_cm(i, j, _n, n)];
+			T6[j * _n + i] = A[SubM_11_cm(i, j, _n, n)] + A[SubM_12_cm(i, j, _n, n)];
+			T7[j * _n + i] = A[SubM_21_cm(i, j, _n, n)] - A[SubM_11_cm(i, j, _n, n)];
+			T8[j * _n + i] = B[SubM_11_cm(i, j, _n, n)] + B[SubM_12_cm(i, j, _n, n)];
+			T9[j * _n + i] = A[SubM_12_cm(i, j, _n, n)] - A[SubM_22_cm(i, j, _n, n)];
+			T0[j * _n + i] = B[SubM_21_cm(i, j, _n, n)] + B[SubM_22_cm(i, j, _n, n)];
 		}
 	}
 	
-	plus(A_11, A_22, APartialResult, _n);
-	plus(B_11, B_22, BPartialResult, _n);
-	dgemm_strassen(APartialResult, BPartialResult, M1, _n);
+	dgemm_strassen(T1, T2, M1, _n);
+	dgemm_strassen(T3, B_11, M2, _n);	
+	dgemm_strassen(A_11, T4, M3, _n);
+	dgemm_strassen(A_22, T5, M4, _n);
+	dgemm_strassen(T6, B_22, M5, _n);
+	dgemm_strassen(T7, T8 , M6, _n);
+	dgemm_strassen(T9, T0, M7, _n);
 	
-	plus(A_21, A_22, APartialResult, _n);
-	dgemm_strassen(APartialResult, B_11, M2, _n);
-	
-	minus(B_12, B_22, BPartialResult, _n);
-	dgemm_strassen(A_11, BPartialResult, M3, _n);
-	
-	minus(B_21, B_11, BPartialResult, _n);
-	dgemm_strassen(A_22, BPartialResult, M4, _n);
-	
-	plus(A_11, A_12, APartialResult, _n);
-	dgemm_strassen(APartialResult, B_22, M5, _n);
-	
-	plus(B_11, B_12, BPartialResult, _n);
-	minus(A_21, A_11, APartialResult, _n);
-	dgemm_strassen(APartialResult, BPartialResult, M6, _n);
-	
-	minus(A_12, A_22, APartialResult, _n);
-	plus(B_21, B_22, BPartialResult, _n);
-	dgemm_strassen(APartialResult, BPartialResult, M7, _n);
-	
-	plus(M3, M5, C_12, _n);
-	plus(M2, M4, C_21, _n);
-	
-	plus(M1, M4, APartialResult, _n);
-	plus(APartialResult, M7, BPartialResult, _n);
-	minus(BPartialResult, M5, C_11, _n);
-	
-	plus(M1, M3, APartialResult, _n);
-	plus(APartialResult, M6, BPartialResult, _n);
-	minus(BPartialResult, M2, C_22, _n);
-	
-	for(i = 0; i < _n; i++) {
-		for(j = 0; j < _n; j++) {
-			C[j * n + i] = C_11[j * _n + i];
-			C[(j + _n) * n + i] = C_12[j * _n + i];
-			C[j * n + (i + _n)] = C_21[j * _n + i];
-			C[(j + _n) * n + (i + _n)] = C_22[j * _n + i];
+	for(j = 0; j < _n; j++) {
+		for(i = 0; i < _n; i++) {
+			C[SubM_11_cm(i, j, _n, n)] = M1[j * _n + i] + M4[j * _n + i] - M5[j * _n + i] + M7[j * _n + i];
+			C[SubM_12_cm(i, j, _n, n)] = M3[j * _n + i] + M5[j * _n + i];
+			C[SubM_21_cm(i, j, _n, n)] = M2[j * _n + i] + M4[j * _n + i];
+			C[SubM_22_cm(i, j, _n, n)] = M1[j * _n + i] - M2[j * _n + i] + M3[j * _n + i] + M6[j * _n + i];
 		}
 	}
-	
+
 	A_11 = freeMatrixColumnMajor(A_11, _n);
-	A_12 = freeMatrixColumnMajor(A_12, _n);
-	A_21 = freeMatrixColumnMajor(A_21, _n);
 	A_22 = freeMatrixColumnMajor(A_22, _n);
-	
 	B_11 = freeMatrixColumnMajor(B_11, _n);
-	B_12 = freeMatrixColumnMajor(B_12, _n);
-	B_21 = freeMatrixColumnMajor(B_21, _n);
 	B_22 = freeMatrixColumnMajor(B_22, _n);
-	
-	C_11 = freeMatrixColumnMajor(C_11, _n);
-	C_12 = freeMatrixColumnMajor(C_12, _n);
-	C_21 = freeMatrixColumnMajor(C_21, _n);
-	C_22 = freeMatrixColumnMajor(C_22, _n);
-	
 	M1 = freeMatrixColumnMajor(M1, _n);
 	M2 = freeMatrixColumnMajor(M2, _n);
 	M3 = freeMatrixColumnMajor(M3, _n);
@@ -199,35 +157,16 @@ static void dgemm_strassen(double *restrict A, double *restrict B, double *restr
 	M5 = freeMatrixColumnMajor(M5, _n);
 	M6 = freeMatrixColumnMajor(M6, _n);
 	M7 = freeMatrixColumnMajor(M7, _n);
-	
-	APartialResult = freeMatrixColumnMajor(APartialResult, _n);
-	BPartialResult = freeMatrixColumnMajor(BPartialResult, _n);
-}
-
-/**
-* Given two real matrices A and B, returns A + B where A, B and 
-* C are size x size.
-*/
-static void plus(double *restrict A, double *restrict B, double *restrict A_plus_B, int size) {	
-	register int i, j;
-	for(i = 0; i < size; i++) {
-		for(j = 0; j < size; j++) {
-			A_plus_B[j * size + i] = A[j * size + i] + B[j * size + i];
-		}
-	}
-}
-
-/**
-* Given two real matrices A and B, returns A - B where A, B and
-* C are size x size.
-*/
-static void minus(double *restrict A, double *restrict B, double *restrict A_minus_B, int size) {
-	register int i, j;
-	for(i = 0; i < size; i++) {
-		for(j = 0; j < size; j++) {
-			A_minus_B[j * size + i] = A[j * size + i] - B[j * size + i];	
-		}
-	}
+	T0 = freeMatrixColumnMajor(T0, _n);
+	T1 = freeMatrixColumnMajor(T1, _n);
+	T2 = freeMatrixColumnMajor(T2, _n);
+	T3 = freeMatrixColumnMajor(T3, _n);
+	T4 = freeMatrixColumnMajor(T4, _n);
+	T5 = freeMatrixColumnMajor(T5, _n);
+	T6 = freeMatrixColumnMajor(T6, _n);
+	T7 = freeMatrixColumnMajor(T7, _n);
+	T8 = freeMatrixColumnMajor(T8, _n);
+	T9 = freeMatrixColumnMajor(T9, _n);
 }
 
 /**
@@ -262,24 +201,24 @@ void square_dgemm(int n, double *restrict A, double *restrict B, double *restric
 	double *restrict Asized2 = createMatrixColumnMajor(correctSize);
 	double *restrict Bsized2 = createMatrixColumnMajor(correctSize);
 	register int i, j;
-	for(i = 0; i < n; i++) {
-		for(j = 0; j < n; j++) {
-			if(i >= n || j >= n) {
-				Asized2[j * n + i] = 0.0;
-				Bsized2[j * n + i] = 0.0;			
+	for(j = 0; j <  correctSize; j++) {
+		for(i = 0; i < correctSize; i++) {
+			if(j >= n || i >= n) {
+				Asized2[j * correctSize + i] = 0.0;
+				Bsized2[j * correctSize + i] = 0.0;			
 			}
 			else {
-				Asized2[j * n + i] = A[j * n + i];
-				Bsized2[j * n + i] = B[j * n + i];
+				Asized2[j * correctSize + i] = A[j * n + i];
+				Bsized2[j * correctSize + i] = B[j * n + i];
 			}
 		}
 	}
 	double *restrict Csized2 = createMatrixColumnMajor(correctSize);
 	dgemm_strassen(Asized2, Bsized2, Csized2, correctSize);
-	for(i = 0; i < n; i++) {
-		for(j = 0; j < n; j++) {
-			if(i < n || j < n) {
-				C[j * n + i] = Csized2[j * n + i];				
+	for(j = 0; j < correctSize; j++) {
+		for(i = 0; i < correctSize; i++) {
+			if(i < n && j < n) {
+				C[j * n + i] = Csized2[j * correctSize + i];				
 			}
 		}
 	}
