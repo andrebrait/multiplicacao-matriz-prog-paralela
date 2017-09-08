@@ -8,6 +8,8 @@
 #define SubM_21_cm(i, j, _n, n) (j * n + (i + _n))
 #define SubM_22_cm(i, j, _n, n) ((j + _n) * n + (i + _n))
 
+#define T_SIZE 256
+
 const char *dgemm_desc = "Strassen divide and conquer dgemm.";
 
 /**
@@ -18,6 +20,35 @@ static void dgemm_strassen(double *restrict A, double *restrict B, double *restr
 static double *restrict createMatrixColumnMajor(int size);
 
 static double *restrict freeMatrixColumnMajor(double *restrict M, int size);
+
+
+#if !defined(BLOCK_SIZE)
+#define BLOCK_SIZE 41
+#endif
+
+#define min(a, b) (((a) < (b)) ? (a) : (b))
+
+/* This auxiliary subroutine performs a smaller dgemm operation
+ *  C := C + A * B
+ * where C is M-by-N, A is M-by-K, and B is K-by-N. */
+static void do_block(int lda, int M, int N, int K, double *restrict A, double *restrict B, double *restrict C) {
+    /* For each row i of A */
+    for (int i = 0; i < M; ++i) {
+        /* For each column j of B */
+        for (int j = 0; j < N; ++j) {
+            /* Compute C(i,j) */
+            int j_index = j * lda;
+            int i_index = i + j_index;
+            double cij = C[i_index];
+            for (int k = 0; k < K; ++k) {
+                double a = A[i + k * lda];
+                double b = B[k + j_index];
+                cij += a * b;
+            }
+            C[i_index] = cij;
+        }
+    }
+}
 
 /**
 * Returns the first value 2^k >= n.
@@ -80,6 +111,19 @@ static int next_power_of_two(int n) {
 static void dgemm_strassen(double *restrict A, double *restrict B, double *restrict C, int n) {
 	if(n == 1) {
 		C[0] = A[0] * B[0];
+		return;
+	}
+	else if(n <= T_SIZE) {	
+		for (int i = 0; i < n; i += BLOCK_SIZE) {
+			for (int j = 0; j < n; j += BLOCK_SIZE) {
+				for (int k = 0; k < n; k += BLOCK_SIZE) {
+				    int M = min(BLOCK_SIZE, n - i);
+				    int N = min(BLOCK_SIZE, n - j);
+				    int K = min(BLOCK_SIZE, n - k);
+					do_block(n, M, N, K, A + i + k * n, B + k + j * n, C + i + j * n);
+				}
+			}
+		}
 		return;
 	}
 	int _n = n/2;
