@@ -9,8 +9,8 @@ const char *dgemm_desc = "Simple blocked dgemm.";
 /* This auxiliary subroutine performs a smaller dgemm operation
  *  C := C + A * B
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
-static void do_block(int lda, int M, int N, int K, double *restrict A,
-                     double *restrict B, double *restrict C) {
+
+static void do_block(int lda, int M, int N, int K, double *restrict A, double *restrict B, double *restrict C) {
     /* For each row i of A */
     for (int i = 0; i < M; ++i) {
         /* For each column j of B */
